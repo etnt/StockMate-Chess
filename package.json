@@ -1,0 +1,27 @@
+{
+  "name": "mychess",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "server": "nodemon src/index.ts",
+    "client": "npm start --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "tsc && npm run build --prefix client"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MPL-2.0",
+  "description": "",
+  "dependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.1",
+    "express": "^4.19.2",
+    "typescript": "^5.5.4"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.4",
+    "ts-node": "^10.9.2"
+  }
+}
