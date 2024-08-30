@@ -1,9 +1,9 @@
 {
   "name": "mychess",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/src/index.js",
   "scripts": {
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "server": "nodemon src/index.ts",
     "client": "npm start --prefix client",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
@@ -20,6 +20,7 @@
     "typescript": "^5.5.4"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.12",
     "concurrently": "^8.2.2",
     "nodemon": "^3.1.4",
     "ts-node": "^10.9.2"

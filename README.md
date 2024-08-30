@@ -26,3 +26,12 @@ Node.js for the backend.
     git init
     git add .
     git commit -m "Initial project setup"
+
+    # Change in the tsconfig.json file
+    "jsx": "react",
+    
+    npm install --save-dev @types/jest
+
+    # Change in the tsconfig.json file
+    "types": ["jest"],
+    
