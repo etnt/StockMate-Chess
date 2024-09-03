@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import { Square } from 'chess.js';
@@ -32,7 +32,21 @@ const App: React.FC = () => {
    * @type {Chess}
    */
   const [game, setGame] = useState(new Chess());
-  const [selectedPiece, setSelectedPiece] = useState<string | null>(null);
+  const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
+  const [moveHistory, setMoveHistory] = useState('');
+  const [fullHistory, setFullHistory] = useState<string[]>([]);
+
+  // Update move history whenever the game state changes
+  useEffect(() => {
+    let formattedHistory = '';
+    for (let i = 0; i < fullHistory.length; i += 2) {
+      const moveNumber = Math.floor(i / 2) + 1;
+      const whiteMove = fullHistory[i];
+      const blackMove = fullHistory[i + 1] || '';
+      formattedHistory += `${moveNumber}. ${whiteMove} ${blackMove}\n`;
+    }
+    setMoveHistory(formattedHistory.trim());
+  }, [game, fullHistory]);
 
   /**
    * Makes a move on the chess board.
@@ -48,6 +62,7 @@ const App: React.FC = () => {
     const result = gameCopy.move({ from, to, promotion: 'q' });
     if (result) {
       setGame(gameCopy);
+      setFullHistory(prevHistory => [...prevHistory, result.san]);
     }
     return result; // null if the move was illegal, the move object if the move was legal
   }
@@ -97,7 +112,7 @@ const App: React.FC = () => {
    */
   function onPieceDrop(sourceSquare: string, targetSquare: string) {
     if (isValidSquare(sourceSquare) && isValidSquare(targetSquare)) {
-      const result = makeAMove(sourceSquare, targetSquare);
+      const result = makeAMove(sourceSquare as Square, targetSquare as Square);
       return result !== null;
     }
     return false;
@@ -118,6 +133,20 @@ const App: React.FC = () => {
           onSquareClick={onSquareClick}
         />
       </div>
+      <div style={{ width: '600px', margin: '20px auto' }}>
+        <textarea
+          value={moveHistory}
+          readOnly
+          style={{ width: '100%', height: '100px', resize: 'vertical' }}
+          placeholder="Moves will appear here as they are made..."
+        />
+      </div>
+      <button onClick={() => {
+        setGame(new Chess());
+        setFullHistory([]);
+      }}>
+        New Game
+      </button>
     </div>
   );
 };
