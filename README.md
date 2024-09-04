@@ -7,6 +7,8 @@ It is built with React and TypeScript for the frontend and Express and
 Node.js for the backend, mainly because I wanted to learn how to build 
 a web app with these technologies.
 
+<img src="stockmate-chess.png" alt="StockMate Chess" width="400" />
+
 ## Getting Started
 
 Start the server:
