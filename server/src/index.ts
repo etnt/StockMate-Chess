@@ -52,7 +52,7 @@ app.post('/api/set-depth', async (req, res) => {
  * @param board - FEN string representing the current board state
  * @returns JSON string of the best move
  */
-async function getNextMove(board: string): Promise<string> {
+async function getNextMove(board: string): Promise<{ move: any, evaluation: number }> {
   try {
     await engine.position(board);
     const result = await engine.go({ depth: searchDepth });
@@ -64,12 +64,28 @@ async function getNextMove(board: string): Promise<string> {
       throw new Error('Invalid move suggested by Stockfish');
     }
 
-    console.log('Valid move:', moveResult);
-    return JSON.stringify(moveResult);
+    // Parse the evaluation from Stockfish output
+    const lastItem = result.info[result.info.length - 1];
+    const lastInfo = typeof lastItem === 'object' ? lastItem as InfoItem : null;
+
+    if (lastInfo && lastInfo.score) {
+      const evaluation = parseFloat(lastInfo.score.value) / 100;
+      console.log('Valid move:', moveResult, 'Evaluation:', evaluation);
+      return { move: moveResult, evaluation };
+    } else {
+      console.error('Invalid or missing score information');
+      return { move: moveResult, evaluation: 0 };
+    }
   } catch (error) {
     console.error('Error getting move from Stockfish:', error);
     throw error;
   }
+}
+
+interface InfoItem {
+  score: {
+    value: string;
+  };
 }
 
 /**
@@ -81,9 +97,8 @@ app.post('/api/move', async (req, res) => {
     const { board } = req.body;
     console.log('Received board:', board);
     await engine.setoption('Depth', searchDepth.toString());
-    const moveString = await getNextMove(board);
-    const move = JSON.parse(moveString);
-    res.json({ move });
+    const { move, evaluation } = await getNextMove(board);
+    res.json({ move, evaluation });
   } catch (error) {
     console.error('Error in /api/move:', error);
     if (error instanceof Error) {

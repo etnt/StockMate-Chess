@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
-import { Square } from 'chess.js';
+import EvaluationBar from './components/EvaluationBar';
 import './App.css';
 /**
  * Chess Game Application
@@ -36,6 +36,8 @@ const App: React.FC = () => {
   const [moveHistory, setMoveHistory] = useState('');
   const [fullHistory, setFullHistory] = useState<string[]>([]);
   const [searchDepth, setSearchDepth] = useState<number>(10); // Default depth
+  const [evaluation, setEvaluation] = useState(0);
+  const boardSize = 600;
 
   // Update move history whenever the game state changes
   useEffect(() => {
@@ -147,9 +149,9 @@ const App: React.FC = () => {
         return;
       }
       console.log('Received move:', data.move);
-      
+
       const { from, to, promotion } = data.move;
-      
+
       if (!from || !to) {
         console.error('Move data is missing "from" or "to" properties');
         return;
@@ -169,6 +171,11 @@ const App: React.FC = () => {
       // Update the game state
       setGame(newGame);
       setFullHistory(prevHistory => [...prevHistory, result.san]);
+
+      // Update evaluation
+      if (data.evaluation !== undefined) {
+        setEvaluation(data.evaluation);
+      }
 
       console.log('Move applied, new FEN:', newGame.fen());
 
@@ -214,7 +221,7 @@ const App: React.FC = () => {
       <div className="game-container">
         <div className="depth-selector">
           <label htmlFor="depth-select">Stockfish Depth:</label>
-          <select 
+          <select
             id="depth-select"
             value={searchDepth}
             onChange={(e) => {
@@ -223,31 +230,36 @@ const App: React.FC = () => {
               setStockfishDepth(newDepth);
             }}
           >
-            {[5, 10, 15, 20].map(depth => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
               <option key={depth} value={depth}>{depth}</option>
             ))}
           </select>
         </div>
-        <Chessboard
-          position={game.fen()}
-          onPieceDrop={onPieceDrop}
-          onSquareClick={onSquareClick}
-        />
+        <div className="board-and-controls">
+          <div className="board-and-evaluation">
+            <Chessboard
+              position={game.fen()}
+              onPieceDrop={onPieceDrop}
+              onSquareClick={onSquareClick}
+            />
+            <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
+          </div>
+          <div className="move-history-container">
+            <textarea
+              className="move-history"
+              value={moveHistory}
+              readOnly
+              placeholder="Moves will appear here as they are made..."
+            />
+          </div>
+        </div>
+        <button onClick={() => {
+          setGame(new Chess());
+          setFullHistory([]);
+        }}>
+          New Game
+        </button>
       </div>
-      <div style={{ width: '600px', margin: '20px auto' }}>
-        <textarea
-          value={moveHistory}
-          readOnly
-          style={{ width: '100%', height: '100px', resize: 'vertical' }}
-          placeholder="Moves will appear here as they are made..."
-        />
-      </div>
-      <button onClick={() => {
-        setGame(new Chess());
-        setFullHistory([]);
-      }}>
-        New Game
-      </button>
     </div>
   );
 };

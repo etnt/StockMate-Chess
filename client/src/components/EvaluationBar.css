@@ -1,0 +1,30 @@
+.evaluation-bar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px;
+    box-sizing: border-box;
+    margin-top: -20px;
+}
+
+.evaluation-bar {
+    width: 20px;
+    flex-grow: 1;
+    background-color: #f0f0f0;
+    /* Light grey for white */
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.evaluation-fill {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    background-color: #404040;
+    /* Dark grey for black */
+}
+
+.evaluation-value {
+    font-size: 14px;
+    font-weight: bold;
+}
