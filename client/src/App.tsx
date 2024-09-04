@@ -267,28 +267,30 @@ const App: React.FC = () => {
     }
   };
 
+  console.log('Rendering App, searchDepth:', searchDepth);
+
   return (
     <div className="App">
       <h1>StockMate Chess</h1>
       <div className="game-container">
-        <div className="depth-selector">
-          <label htmlFor="depth-select">Stockfish Depth:</label>
-          <select
-            id="depth-select"
-            value={searchDepth}
-            onChange={(e) => {
-              const newDepth = parseInt(e.target.value);
-              setSearchDepth(newDepth);
-              setStockfishDepth(newDepth);
-            }}
-          >
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
-              <option key={depth} value={depth}>{depth}</option>
-            ))}
-          </select>
-        </div>
         <div className="board-and-controls">
           <div className="side-controls">
+            <div className="depth-selector">
+              <label htmlFor="depth-select">Stockfish Depth:</label>
+              <select
+                id="depth-select"
+                value={searchDepth}
+                onChange={(e) => {
+                  const newDepth = parseInt(e.target.value);
+                  setSearchDepth(newDepth);
+                  setStockfishDepth(newDepth);
+                }}
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
+                  <option key={depth} value={depth}>{depth}</option>
+                ))}
+              </select>
+            </div>
             <button className="new-game-button" onClick={startNewGame}>New Game</button>
             <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
           </div>

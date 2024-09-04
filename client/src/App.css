@@ -56,6 +56,23 @@
   display: flex;
   flex-direction: column;
   margin-right: 20px;
+  min-width: 150px; /* Ensure there's enough width for the controls */
+}
+
+.depth-selector {
+  margin-bottom: 15px;
+  /* Remove the position: absolute */
+}
+
+.depth-selector label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.depth-selector select {
+  width: 100%;
+  padding: 5px;
+  font-size: 16px;
 }
 
 .new-game-button,
@@ -83,11 +100,6 @@
 }
 
 .depth-selector {
-  position: absolute;
-  top: -50px;
-  /* Adjusted to move it slightly higher */
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
