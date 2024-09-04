@@ -244,6 +244,9 @@ const App: React.FC = () => {
           </select>
         </div>
         <div className="board-and-controls">
+          <div className="side-controls">
+            <button className="new-game-button" onClick={startNewGame}>New Game</button>
+          </div>
           <div className="board-and-evaluation">
             <Chessboard
               position={game.fen()}
@@ -252,16 +255,15 @@ const App: React.FC = () => {
             />
             <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
           </div>
-          <div className="move-history-container">
-            <textarea
-              className="move-history"
-              value={moveHistory}
-              readOnly
-              placeholder="Moves will appear here as they are made..."
-            />
-          </div>
         </div>
-        <button onClick={startNewGame}>New Game</button>
+        <div className="move-history-container">
+          <textarea
+            className="move-history"
+            value={moveHistory}
+            readOnly
+            placeholder="Moves will appear here as they are made..."
+          />
+        </div>
       </div>
     </div>
   );
