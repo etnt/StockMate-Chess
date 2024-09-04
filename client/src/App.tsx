@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
-import { Chess } from 'chess.js';
 import EvaluationBar from './components/EvaluationBar';
 import './App.css';
 
@@ -66,6 +66,7 @@ const App: React.FC = () => {
         setGame(gameCopy);
         setFullHistory(prevHistory => [...prevHistory, result.san]);
         setSuggestedMove(null);
+        setSelectedPiece(null);  // Clear the selected piece after a move
         return result;
       }
     } catch (error) {
@@ -227,6 +228,7 @@ const App: React.FC = () => {
     setMoveHistory(''); // Clear the formatted move history
     setFullHistory([]); // Clear the full history array
     setSuggestedMove(null);
+    setSelectedPiece(null); // Reset the selected piece
     // Reset any other relevant state variables
   };
 
@@ -237,6 +239,7 @@ const App: React.FC = () => {
   const requestSuggestion = async () => {
     if (game.turn() === 'w') {
       try {
+        setSelectedPiece(null); // Reset the selected piece
         const response = await fetch('http://localhost:3001/api/suggest', {
           method: 'POST',
           headers: {
@@ -301,8 +304,9 @@ const App: React.FC = () => {
                 onPieceDrop={onPieceDrop}
                 onSquareClick={onSquareClick}
                 customSquareStyles={{
-                  [suggestedMove?.from]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' },
-                  [suggestedMove?.to]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' },
+                  ...(selectedPiece && { [selectedPiece]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' } }),
+                  ...(suggestedMove?.from && { [suggestedMove.from]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
+                  ...(suggestedMove?.to && { [suggestedMove.to]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
                 }}
               />
               <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
