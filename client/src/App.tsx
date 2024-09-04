@@ -38,18 +38,11 @@ const App: React.FC = () => {
 
   // Update move history whenever the game state changes
   useEffect(() => {
-    let formattedHistory = '';
-    for (let i = 0; i < fullHistory.length; i += 2) {
-      const moveNumber = Math.floor(i / 2) + 1;
-      const whiteMove = fullHistory[i];
-      const blackMove = fullHistory[i + 1] || '';
-      formattedHistory += `${moveNumber}. ${whiteMove} ${blackMove}\n`;
+    updateMoveHistory();
+    if (game.turn() === 'b') {
+      requestMove();
     }
-    setMoveHistory(formattedHistory.trim());
-    fetch('http://localhost:3001/api/game')
-      .then(response => response.json())
-      .then(data => console.log(data));
-  }, [game, fullHistory]);
+  }, [game]);
 
   /**
    * Makes a move on the chess board.
@@ -62,12 +55,17 @@ const App: React.FC = () => {
    */
   function makeAMove(from: Square, to: Square) {
     const gameCopy = new Chess(game.fen());
-    const result = gameCopy.move({ from, to, promotion: 'q' });
-    if (result) {
-      setGame(gameCopy);
-      setFullHistory(prevHistory => [...prevHistory, result.san]);
+    try {
+      const result = gameCopy.move({ from, to, promotion: 'q' });
+      if (result) {
+        setGame(gameCopy);
+        setFullHistory(prevHistory => [...prevHistory, result.san]);
+        return result;
+      }
+    } catch (error) {
+      console.error('Invalid move:', error);
     }
-    return result; // null if the move was illegal, the move object if the move was legal
+    return null; // Return null for invalid moves
   }
 
   /**
@@ -124,6 +122,69 @@ const App: React.FC = () => {
   function isValidSquare(square: string): square is Square {
     // Add logic to validate if the string is a valid chess square
     return /^[a-h][1-8]$/.test(square);
+  }
+
+  async function requestMove() {
+    try {
+      console.log('Requesting move from server:', game.fen());
+      const response = await fetch('http://localhost:3001/api/move', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ board: game.fen() }),
+      });
+      const data = await response.json();
+
+      if (data.error) {
+        console.error('Server error:', data.error);
+        return;
+      }
+
+      if (!data.move || typeof data.move !== 'object') {
+        console.error('Invalid move data received from server:', data);
+        return;
+      }
+      console.log('Received move:', data.move);
+      
+      const { from, to, promotion } = data.move;
+      
+      if (!from || !to) {
+        console.error('Move data is missing "from" or "to" properties');
+        return;
+      }
+
+      // Create a new Chess instance
+      const newGame = new Chess(game.fen());
+
+      // Make the move on the new chess instance
+      const result = newGame.move({ from, to, promotion });
+
+      if (result === null) {
+        console.error(`Invalid move: ${JSON.stringify(data.move)}`);
+        return;
+      }
+
+      // Update the game state
+      setGame(newGame);
+      setFullHistory(prevHistory => [...prevHistory, result.san]);
+
+      console.log('Move applied, new FEN:', newGame.fen());
+
+    } catch (error) {
+      console.error('Error requesting move from server:', error);
+    }
+  }
+
+  function updateMoveHistory() {
+    let formattedHistory = '';
+    for (let i = 0; i < fullHistory.length; i += 2) {
+      const moveNumber = Math.floor(i / 2) + 1;
+      const whiteMove = fullHistory[i];
+      const blackMove = fullHistory[i + 1] || '';
+      formattedHistory += `${moveNumber}. ${whiteMove} ${blackMove}\n`;
+    }
+    setMoveHistory(formattedHistory.trim());
   }
 
   return (
