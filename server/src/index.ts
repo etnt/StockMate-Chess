@@ -70,7 +70,7 @@ async function getNextMove(board: string): Promise<{ move: any, evaluation: numb
 
     if (lastInfo && lastInfo.score) {
       const evaluation = parseFloat(lastInfo.score.value) / 100;
-      console.log('Valid move:', moveResult, 'Evaluation:', evaluation);
+      console.log('Suggested move:', moveResult, 'Evaluation:', evaluation);
       return { move: moveResult, evaluation };
     } else {
       console.error('Invalid or missing score information');
@@ -101,6 +101,40 @@ app.post('/api/move', async (req, res) => {
     res.json({ move, evaluation });
   } catch (error) {
     console.error('Error in /api/move:', error);
+    if (error instanceof Error) {
+      res.status(500).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "An unknown error occurred" });
+    }
+  }
+});
+
+/**
+ * Suggest the best move for the current board position.
+ * POST /api/suggest
+ */
+app.post('/api/suggest', async (req, res) => {
+  try {
+    const { board } = req.body;
+    console.log('Received board for suggestion:', board);
+
+    if (!board) {
+      return res.status(400).json({ error: 'Board position is required' });
+    }
+
+    await engine.setoption('Depth', searchDepth.toString());
+    const { move, evaluation } = await getNextMove(board);
+
+    // Convert the move to the format expected by the client
+    const suggestedMove = {
+      from: move.from,
+      to: move.to,
+      promotion: move.promotion
+    };
+
+    res.json({ move: suggestedMove, evaluation });
+  } catch (error) {
+    console.error('Error in /api/suggest:', error);
     if (error instanceof Error) {
       res.status(500).json({ error: error.message });
     } else {

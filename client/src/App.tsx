@@ -38,6 +38,7 @@ const App: React.FC = () => {
   const [fullHistory, setFullHistory] = useState<string[]>([]);
   const [searchDepth, setSearchDepth] = useState<number>(10); // Default depth
   const [evaluation, setEvaluation] = useState(0);
+  const [suggestedMove, setSuggestedMove] = useState(null);
   const boardSize = 600;
 
   // Update move history whenever the game state changes
@@ -64,6 +65,7 @@ const App: React.FC = () => {
       if (result) {
         setGame(gameCopy);
         setFullHistory(prevHistory => [...prevHistory, result.san]);
+        setSuggestedMove(null);
         return result;
       }
     } catch (error) {
@@ -224,7 +226,45 @@ const App: React.FC = () => {
     setEvaluation(0); // Reset evaluation to 0
     setMoveHistory(''); // Clear the formatted move history
     setFullHistory([]); // Clear the full history array
+    setSuggestedMove(null);
     // Reset any other relevant state variables
+  };
+
+  const highlightSuggestedMove = (move) => {
+    setSuggestedMove(move);
+  };
+
+  const requestSuggestion = async () => {
+    if (game.turn() === 'w') {
+      try {
+        const response = await fetch('http://localhost:3001/api/suggest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ board: game.fen() }),
+        });
+        const data = await response.json();
+
+        if (data.error) {
+          console.error('Server error:', data.error);
+          return;
+        }
+
+        if (!data.move || typeof data.move !== 'object') {
+          console.error('Invalid move data received from server:', data);
+          return;
+        }
+
+        // Highlight the suggested move on the board
+        highlightSuggestedMove(data.move);
+
+      } catch (error) {
+        console.error('Error requesting move suggestion:', error);
+      }
+    } else {
+      console.log("It's not White's turn to move");
+    }
   };
 
   return (
@@ -250,6 +290,7 @@ const App: React.FC = () => {
         <div className="board-and-controls">
           <div className="side-controls">
             <button className="new-game-button" onClick={startNewGame}>New Game</button>
+            <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
           </div>
           <div className="main-game-area">
             <div className="board-and-evaluation">
@@ -257,6 +298,10 @@ const App: React.FC = () => {
                 position={game.fen()}
                 onPieceDrop={onPieceDrop}
                 onSquareClick={onSquareClick}
+                customSquareStyles={{
+                  [suggestedMove?.from]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' },
+                  [suggestedMove?.to]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' },
+                }}
               />
               <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
             </div>
