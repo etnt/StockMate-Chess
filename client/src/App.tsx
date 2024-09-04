@@ -35,6 +35,7 @@ const App: React.FC = () => {
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [moveHistory, setMoveHistory] = useState('');
   const [fullHistory, setFullHistory] = useState<string[]>([]);
+  const [searchDepth, setSearchDepth] = useState<number>(10); // Default depth
 
   // Update move history whenever the game state changes
   useEffect(() => {
@@ -176,6 +177,26 @@ const App: React.FC = () => {
     }
   }
 
+  async function setStockfishDepth(depth: number) {
+    try {
+      const response = await fetch('http://localhost:3001/api/set-depth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ depth }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        console.log(`Search depth set to ${depth}`);
+      } else {
+        console.error('Failed to set search depth:', data.error);
+      }
+    } catch (error) {
+      console.error('Error setting search depth:', error);
+    }
+  }
+
   function updateMoveHistory() {
     let formattedHistory = '';
     for (let i = 0; i < fullHistory.length; i += 2) {
@@ -190,7 +211,23 @@ const App: React.FC = () => {
   return (
     <div className="App">
       <h1>Chess Board</h1>
-      <div style={{ width: '600px', margin: 'auto' }}>
+      <div className="game-container">
+        <div className="depth-selector">
+          <label htmlFor="depth-select">Stockfish Depth:</label>
+          <select 
+            id="depth-select"
+            value={searchDepth}
+            onChange={(e) => {
+              const newDepth = parseInt(e.target.value);
+              setSearchDepth(newDepth);
+              setStockfishDepth(newDepth);
+            }}
+          >
+            {[5, 10, 15, 20].map(depth => (
+              <option key={depth} value={depth}>{depth}</option>
+            ))}
+          </select>
+        </div>
         <Chessboard
           position={game.fen()}
           onPieceDrop={onPieceDrop}

@@ -16,6 +16,7 @@ app.use(express.json());
 
 // Initialize the Stockfish engine
 let engine: Engine;
+let searchDepth = 10; // Default depth
 
 async function initializeEngine() {
   engine = new Engine('/opt/homebrew/bin/stockfish');
@@ -26,10 +27,21 @@ async function initializeEngine() {
 
 initializeEngine();
 
+app.post('/api/set-depth', async (req, res) => {
+  const { depth } = req.body;
+  if (typeof depth === 'number' && depth > 0) {
+    searchDepth = depth;
+    await engine.setoption('Depth', depth.toString());
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ success: false, error: 'Invalid depth value' });
+  }
+});
+
 async function getNextMove(board: string): Promise<string> {
   try {
     await engine.position(board);
-    const result = await engine.go({ depth: 1 });
+    const result = await engine.go({ depth: searchDepth });
 
     const chess = new Chess(board);
     const moveResult = chess.move(result.bestmove);
@@ -50,6 +62,7 @@ app.post('/api/move', async (req, res) => {
   try {
     const { board } = req.body;
     console.log('Received board:', board);
+    await engine.setoption('Depth', searchDepth.toString());
     const moveString = await getNextMove(board);
     const move = JSON.parse(moveString);
     res.json({ move });

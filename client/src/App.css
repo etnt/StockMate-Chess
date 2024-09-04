@@ -37,3 +37,45 @@
     transform: rotate(360deg);
   }
 }
+
+.game-container {
+  width: 600px;
+  margin: 60px auto 0; /* Increased top margin */
+  position: relative;
+}
+
+.depth-selector {
+  position: absolute;
+  top: -50px; /* Adjusted to move it slightly higher */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.depth-selector label {
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.depth-selector select {
+  padding: 5px 10px;
+  font-size: 16px;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.depth-selector select:hover {
+  border-color: #888;
+}
+
+.depth-selector select:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+}
