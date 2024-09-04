@@ -1,10 +1,11 @@
-# My Chess Site
+# StockMate Chess
 
-My Chess Site is a web application that allows you to play chess online.
+StockMate Chess is a web application that allows you to play chess with 
+a local Stockfish engine.
+
 It is built with React and TypeScript for the frontend and Express and 
-Node.js for the backend.
-
-It uses Stockfish as the chess engine, running locally on your machine.
+Node.js for the backend, mainly because I wanted to learn how to build 
+a web app with these technologies.
 
 ## Getting Started
 
