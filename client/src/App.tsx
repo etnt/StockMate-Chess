@@ -215,9 +215,17 @@ const App: React.FC = () => {
     setMoveHistory(formattedHistory.trim());
   }
 
+  const startNewGame = () => {
+    setGame(new Chess());
+    setEvaluation(0); // Reset evaluation to 0
+    setMoveHistory(''); // Clear the formatted move history
+    setFullHistory([]); // Clear the full history array
+    // Reset any other relevant state variables
+  };
+
   return (
     <div className="App">
-      <h1>Chess Board</h1>
+      <h1>StockMate Chess</h1>
       <div className="game-container">
         <div className="depth-selector">
           <label htmlFor="depth-select">Stockfish Depth:</label>
@@ -253,12 +261,7 @@ const App: React.FC = () => {
             />
           </div>
         </div>
-        <button onClick={() => {
-          setGame(new Chess());
-          setFullHistory([]);
-        }}>
-          New Game
-        </button>
+        <button onClick={startNewGame}>New Game</button>
       </div>
     </div>
   );
