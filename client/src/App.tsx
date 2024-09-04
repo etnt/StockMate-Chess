@@ -46,6 +46,9 @@ const App: React.FC = () => {
       formattedHistory += `${moveNumber}. ${whiteMove} ${blackMove}\n`;
     }
     setMoveHistory(formattedHistory.trim());
+    fetch('http://localhost:3001/api/game')
+      .then(response => response.json())
+      .then(data => console.log(data));
   }, [game, fullHistory]);
 
   /**
