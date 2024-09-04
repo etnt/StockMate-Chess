@@ -3,9 +3,11 @@ import cors from 'cors';
 import { Engine } from 'node-uci';
 import { Chess } from 'chess.js';
 
+// Initialize Express app and set port
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Configure CORS for the Express app
 app.use(cors({
   origin: 'http://localhost:3000',
   methods: ['GET', 'POST'],
@@ -14,10 +16,13 @@ app.use(cors({
 
 app.use(express.json());
 
-// Initialize the Stockfish engine
+// Initialize Stockfish engine
 let engine: Engine;
-let searchDepth = 10; // Default depth
+let searchDepth = 10; // Default search depth
 
+/**
+ * Initialize the Stockfish chess engine.
+ */
 async function initializeEngine() {
   engine = new Engine('/opt/homebrew/bin/stockfish');
   await engine.init();
@@ -27,6 +32,10 @@ async function initializeEngine() {
 
 initializeEngine();
 
+/**
+ * Set the search depth for the Stockfish engine.
+ * POST /api/set-depth
+ */
 app.post('/api/set-depth', async (req, res) => {
   const { depth } = req.body;
   if (typeof depth === 'number' && depth > 0) {
@@ -38,6 +47,11 @@ app.post('/api/set-depth', async (req, res) => {
   }
 });
 
+/**
+ * Get the next best move from Stockfish for a given board position.
+ * @param board - FEN string representing the current board state
+ * @returns JSON string of the best move
+ */
 async function getNextMove(board: string): Promise<string> {
   try {
     await engine.position(board);
@@ -58,6 +72,10 @@ async function getNextMove(board: string): Promise<string> {
   }
 }
 
+/**
+ * Get the next move from Stockfish for a given board position.
+ * POST /api/move
+ */
 app.post('/api/move', async (req, res) => {
   try {
     const { board } = req.body;
@@ -76,10 +94,12 @@ app.post('/api/move', async (req, res) => {
   }
 });
 
+// Root endpoint
 app.get('/', (req, res) => {
   res.send('Hello from Chess Site Backend!');
 });
 
+// Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
