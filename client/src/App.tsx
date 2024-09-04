@@ -3,6 +3,7 @@ import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import EvaluationBar from './components/EvaluationBar';
 import './App.css';
+
 /**
  * Chess Game Application
  * 
@@ -160,6 +161,9 @@ const App: React.FC = () => {
       // Create a new Chess instance
       const newGame = new Chess(game.fen());
 
+      // Add a delay before making the move (e.g., 500ms)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Make the move on the new chess instance
       const result = newGame.move({ from, to, promotion });
 
@@ -247,22 +251,24 @@ const App: React.FC = () => {
           <div className="side-controls">
             <button className="new-game-button" onClick={startNewGame}>New Game</button>
           </div>
-          <div className="board-and-evaluation">
-            <Chessboard
-              position={game.fen()}
-              onPieceDrop={onPieceDrop}
-              onSquareClick={onSquareClick}
-            />
-            <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
+          <div className="main-game-area">
+            <div className="board-and-evaluation">
+              <Chessboard
+                position={game.fen()}
+                onPieceDrop={onPieceDrop}
+                onSquareClick={onSquareClick}
+              />
+              <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
+            </div>
+            <div className="move-history-container">
+              <textarea
+                className="move-history"
+                value={moveHistory}
+                readOnly
+                placeholder="Moves will appear here as they are made..."
+              />
+            </div>
           </div>
-        </div>
-        <div className="move-history-container">
-          <textarea
-            className="move-history"
-            value={moveHistory}
-            readOnly
-            placeholder="Moves will appear here as they are made..."
-          />
         </div>
       </div>
     </div>

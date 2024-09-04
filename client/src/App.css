@@ -70,7 +70,6 @@
 
 .move-history-container {
   width: 100%;
-  max-width: 600px; /* Adjust to match your board size */
   margin-top: 20px;
 }
 
