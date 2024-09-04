@@ -143,6 +143,45 @@ app.post('/api/suggest', async (req, res) => {
   }
 });
 
+/**
+ * Evaluate the current board position.
+ * POST /api/evaluate
+ */
+app.post('/api/evaluate', async (req, res) => {
+  try {
+    const { board } = req.body;
+    console.log('Received board for evaluation:', board);
+
+    if (!board) {
+      return res.status(400).json({ error: 'Board position is required' });
+    }
+
+    await engine.setoption('Depth', searchDepth.toString());
+    await engine.position(board);
+    const result = await engine.go({ depth: searchDepth });
+
+    // Parse the evaluation from Stockfish output
+    const lastItem = result.info[result.info.length - 1];
+    const lastInfo = typeof lastItem === 'object' ? lastItem as InfoItem : null;
+
+    if (lastInfo && lastInfo.score) {
+      const evaluation = parseFloat(lastInfo.score.value) / 100;
+      console.log('Evaluation:', evaluation);
+      res.json({ evaluation });
+    } else {
+      console.error('Invalid or missing score information');
+      res.status(500).json({ error: 'Unable to evaluate position' });
+    }
+  } catch (error) {
+    console.error('Error in /api/evaluate:', error);
+    if (error instanceof Error) {
+      res.status(500).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "An unknown error occurred" });
+    }
+  }
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.send('Hello from Chess Site Backend!');

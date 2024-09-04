@@ -144,3 +144,27 @@
   font-size: 14px;
   font-weight: bold;
 }
+
+.new-game-button,
+.suggest-button,
+.go-back-button {
+  padding: 10px 15px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.go-back-button {
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ccc;
+}
+
+.go-back-button:hover {
+  background-color: #e0e0e0;
+}
+
+.go-back-button:active {
+  background-color: #d0d0d0;
+}

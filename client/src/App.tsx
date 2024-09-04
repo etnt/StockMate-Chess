@@ -32,7 +32,8 @@ const App: React.FC = () => {
    * 
    * @type {Chess}
    */
-  const [game, setGame] = useState(new Chess());
+  const [game, setGame] = useState<Chess>(new Chess());
+  const [fen, setFen] = useState(game.fen());
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [moveHistory, setMoveHistory] = useState('');
   const [fullHistory, setFullHistory] = useState<string[]>([]);
@@ -43,11 +44,12 @@ const App: React.FC = () => {
 
   // Update move history whenever the game state changes
   useEffect(() => {
+    setFen(game.fen());
     updateMoveHistory();
     if (game.turn() === 'b') {
       requestMove();
     }
-  }, [game]);
+  }, [game, fullHistory]);
 
   /**
    * Makes a move on the chess board.
@@ -58,12 +60,14 @@ const App: React.FC = () => {
    * @param {Object} move - The move to be made, typically containing 'from' and 'to' properties.
    * @returns {Object|null} The move object if the move was legal, null if it was illegal.
    */
-  function makeAMove(from: Square, to: Square) {
+  const makeAMove = (from: Square, to: Square) => {
     const gameCopy = new Chess(game.fen());
     try {
       const result = gameCopy.move({ from, to, promotion: 'q' });
       if (result) {
+        console.log('Move made:', result.san);
         setGame(gameCopy);
+        setFen(gameCopy.fen());
         setFullHistory(prevHistory => [...prevHistory, result.san]);
         setSuggestedMove(null);
         setSelectedPiece(null);  // Clear the selected piece after a move
@@ -73,7 +77,7 @@ const App: React.FC = () => {
       console.error('Invalid move:', error);
     }
     return null; // Return null for invalid moves
-  }
+  };
 
   /**
    * Handles the clicking of a square on the chess board.
@@ -177,6 +181,7 @@ const App: React.FC = () => {
 
       // Update the game state
       setGame(newGame);
+      setFen(newGame.fen());
       setFullHistory(prevHistory => [...prevHistory, result.san]);
 
       // Update evaluation
@@ -220,10 +225,12 @@ const App: React.FC = () => {
       formattedHistory += `${moveNumber}. ${whiteMove} ${blackMove}\n`;
     }
     setMoveHistory(formattedHistory.trim());
-  }
+  };
 
   const startNewGame = () => {
-    setGame(new Chess());
+    const newGame = new Chess();
+    setGame(newGame);
+    setFen(newGame.fen());
     setEvaluation(0); // Reset evaluation to 0
     setMoveHistory(''); // Clear the formatted move history
     setFullHistory([]); // Clear the full history array
@@ -270,7 +277,68 @@ const App: React.FC = () => {
     }
   };
 
-  console.log('Rendering App, searchDepth:', searchDepth);
+  async function requestEvaluation(fen: string): Promise<number | null> {
+    try {
+      const response = await fetch('http://localhost:3001/api/evaluate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ board: fen }),
+      });
+
+      const data = await response.json();
+      if (data.evaluation !== undefined) {
+        return data.evaluation;
+      } else if (data.error) {
+        console.error('Evaluation error:', data.error);
+      }
+    } catch (error) {
+      console.error('Error requesting evaluation:', error);
+    }
+    return null;
+  }
+
+  async function undoLastMove() {
+    console.log('Undoing last move 1:', fullHistory);
+    if (fullHistory.length > 0) {
+      let newHistory;
+      if (fullHistory.length % 2 === 0) {
+        // If even number of moves, remove the last two
+        newHistory = fullHistory.slice(0, -2);
+      } else {
+        // If odd number of moves, remove only the last one
+        newHistory = fullHistory.slice(0, -1);
+      }
+
+      console.log('Undoing last move 2:', newHistory);
+
+      const newGame = new Chess();
+      newHistory.forEach(move => newGame.move(move));
+
+      console.log('Undoing last move 3:', newGame.history());
+
+      setGame(newGame);
+      setFen(newGame.fen());
+      setFullHistory(newHistory);
+      setSuggestedMove(null);
+      setSelectedPiece(null);
+      updateMoveHistory();
+
+      if (newHistory.length > 0) {
+        // Request new evaluation
+        const newEvaluation = await requestEvaluation(newGame.fen());
+        if (newEvaluation !== null) {
+          setEvaluation(-newEvaluation);
+        }
+      }
+      else {
+        setEvaluation(0);
+      }
+    } else {
+      console.log('No moves to undo');
+    }
+  }
 
   return (
     <div className="App">
@@ -296,11 +364,12 @@ const App: React.FC = () => {
             </div>
             <button className="new-game-button" onClick={startNewGame}>New Game</button>
             <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
+            <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
           </div>
           <div className="main-game-area">
             <div className="board-and-evaluation">
               <Chessboard
-                position={game.fen()}
+                position={game.fen}
                 onPieceDrop={onPieceDrop}
                 onSquareClick={onSquareClick}
                 customSquareStyles={{
