@@ -369,7 +369,7 @@ const App: React.FC = () => {
           <div className="main-game-area">
             <div className="board-and-evaluation">
               <Chessboard
-                position={game.fen}
+                position={fen}
                 onPieceDrop={onPieceDrop}
                 onSquareClick={onSquareClick}
                 customSquareStyles={{
