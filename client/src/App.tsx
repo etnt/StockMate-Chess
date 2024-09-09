@@ -62,7 +62,7 @@ const App: React.FC = () => {
    * @param {Object} move - The move to be made, typically containing 'from' and 'to' properties.
    * @returns {Object|null} The move object if the move was legal, null if it was illegal.
    */
-  const makeAMove = (from: Square, to: Square) => {
+  const makeAMove = async (from: Square, to: Square) => {
     const gameCopy = new Chess(game.fen());
     try {
       const result = gameCopy.move({ from, to, promotion: 'q' });
@@ -72,13 +72,36 @@ const App: React.FC = () => {
         setFen(gameCopy.fen());
         setFullHistory(prevHistory => [...prevHistory, result.san]);
         setSuggestedMove(null);
-        setSelectedPiece(null);  // Clear the selected piece after a move
+        setSelectedPiece(null);
+
+        // Inform ChessTune server about the move
+        if (opponent === 'chesstune') {
+          await informChessTuneAboutMove(`${from}${to}`);
+        }
+
         return result;
       }
     } catch (error) {
       console.error('Invalid move:', error);
     }
     return null; // Return null for invalid moves
+  };
+
+  const informChessTuneAboutMove = async (move: string) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/inform-chesstune', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ move }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to inform ChessTune about the move');
+      }
+    } catch (error) {
+      console.error('Error informing ChessTune about move:', error);
+    }
   };
 
   /**

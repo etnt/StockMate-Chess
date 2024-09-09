@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { Engine } from 'node-uci';
 import { Chess } from 'chess.js';
+import axios from 'axios'; // Make sure to install axios: npm install axios
 
 // Initialize Express app and set port
 const app = express();
@@ -19,6 +20,8 @@ app.use(express.json());
 // Initialize Stockfish engine
 let engine: Engine;
 let searchDepth = 10; // Default search depth
+
+const CHESS_TUNE_URL = 'http://127.0.0.1:5000'; // Update this if the URL is different
 
 /**
  * Initialize the Stockfish chess engine.
@@ -52,7 +55,7 @@ app.post('/api/set-depth', async (req, res) => {
  * @param board - FEN string representing the current board state
  * @returns JSON string of the best move
  */
-async function getNextMove(board: string): Promise<{ move: any, evaluation: number }> {
+async function getStockfishMove(board: string): Promise<{ move: any, evaluation: number }> {
   try {
     await engine.position(board);
     const result = await engine.go({ depth: searchDepth });
@@ -88,16 +91,55 @@ interface InfoItem {
   };
 }
 
+async function getChessTuneMove(board: string): Promise<{ move: any, evaluation: number }> {
+  try {
+    // Get the move from ChessTune
+    const response = await axios.get(`${CHESS_TUNE_URL}/get_move`);
+    const chessTuneMove = response.data.move;
+
+    // Convert the move to the format expected by the client
+    const chess = new Chess(board);
+    const moveObject = chess.move(chessTuneMove);
+
+    if (!moveObject) {
+      throw new Error('Invalid move suggested by ChessTune');
+    }
+
+    return { move: moveObject, evaluation: 0 }; // ChessTune doesn't provide evaluation
+  } catch (error) {
+    console.error('Error getting move from ChessTune:', error);
+    throw error;
+  }
+}
+
+async function getNextMove(board: string, opponent: string): Promise<{ move: any, evaluation: number }> {
+  switch (opponent) {
+    case 'stockfish':
+      return getStockfishMove(board);
+    case 'chesstune':
+      return getChessTuneMove(board);
+    case 'human':
+      throw new Error('Human moves should be handled client-side');
+    default:
+      throw new Error('Invalid opponent type');
+  }
+}
+
 /**
- * Get the next move from Stockfish for a given board position.
+ * Get the next move from the selected opponent for a given board position.
  * POST /api/move
  */
 app.post('/api/move', async (req, res) => {
   try {
-    const { board } = req.body;
+    const { board, opponent } = req.body;
     console.log('Received board:', board);
-    await engine.setoption('Depth', searchDepth.toString());
-    const { move, evaluation } = await getNextMove(board);
+    console.log('Selected opponent:', opponent);
+
+    if (!board || !opponent) {
+      return res.status(400).json({ error: 'Board position and opponent are required' });
+    }
+
+    const { move, evaluation } = await getNextMove(board, opponent);
     res.json({ move, evaluation });
   } catch (error) {
     console.error('Error in /api/move:', error);
@@ -123,7 +165,7 @@ app.post('/api/suggest', async (req, res) => {
     }
 
     await engine.setoption('Depth', searchDepth.toString());
-    const { move, evaluation } = await getNextMove(board);
+    const { move, evaluation } = await getNextMove(board, 'stockfish');
 
     // Convert the move to the format expected by the client
     const suggestedMove = {
@@ -190,4 +232,27 @@ app.get('/', (req, res) => {
 // Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
+});
+
+async function applyMoveToChessTune(move: string) {
+  try {
+    await axios.post(`${CHESS_TUNE_URL}/move`, { move });
+  } catch (error) {
+    console.error('Error applying move to ChessTune:', error);
+    throw error;
+  }
+}
+
+app.post('/api/inform-chesstune', async (req, res) => {
+  try {
+    const { move } = req.body;
+    if (!move) {
+      return res.status(400).json({ error: 'Move is required' });
+    }
+    await applyMoveToChessTune(move);
+    res.json({ message: 'Move applied to ChessTune successfully' });
+  } catch (error) {
+    console.error('Error informing ChessTune about move:', error);
+    res.status(500).json({ error: 'Failed to inform ChessTune about the move' });
+  }
 });
