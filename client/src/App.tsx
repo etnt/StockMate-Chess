@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import EvaluationBar from './components/EvaluationBar';
+import OpponentSelector from './components/OpponentSelector';
 import './App.css';
 
 /**
@@ -40,6 +41,7 @@ const App: React.FC = () => {
   const [searchDepth, setSearchDepth] = useState<number>(10); // Default depth
   const [evaluation, setEvaluation] = useState(0);
   const [suggestedMove, setSuggestedMove] = useState(null);
+  const [opponent, setOpponent] = useState<string>('stockfish');
   const boardSize = 600;
 
   // Update move history whenever the game state changes
@@ -143,7 +145,7 @@ const App: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ board: game.fen() }),
+        body: JSON.stringify({ board: game.fen(), opponent }),
       });
       const data = await response.json();
 
@@ -346,22 +348,28 @@ const App: React.FC = () => {
       <div className="game-container">
         <div className="board-and-controls">
           <div className="side-controls">
-            <div className="depth-selector">
-              <label htmlFor="depth-select">Stockfish Depth:</label>
-              <select
-                id="depth-select"
-                value={searchDepth}
-                onChange={(e) => {
-                  const newDepth = parseInt(e.target.value);
-                  setSearchDepth(newDepth);
-                  setStockfishDepth(newDepth);
-                }}
-              >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
-                  <option key={depth} value={depth}>{depth}</option>
-                ))}
-              </select>
-            </div>
+            <OpponentSelector
+              opponent={opponent}
+              setOpponent={setOpponent}
+            />
+            {opponent === 'stockfish' && (
+              <div className="depth-selector">
+                <label htmlFor="depth-select">Stockfish Depth:</label>
+                <select
+                  id="depth-select"
+                  value={searchDepth}
+                  onChange={(e) => {
+                    const newDepth = parseInt(e.target.value);
+                    setSearchDepth(newDepth);
+                    setStockfishDepth(newDepth);
+                  }}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
+                    <option key={depth} value={depth}>{depth}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <button className="new-game-button" onClick={startNewGame}>New Game</button>
             <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
             <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
