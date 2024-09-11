@@ -3,6 +3,8 @@ import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import EvaluationBar from './components/EvaluationBar';
 import OpponentSelector from './components/OpponentSelector';
+import { GetMoveRequest, GetMoveResponse, SuccessfulGetMoveResponse } from '../../shared/types';
+import { MoveRequest, MoveResponse } from '../../shared/types';
 import './App.css';
 
 /**
@@ -22,6 +24,8 @@ import './App.css';
  * 
  * @component
  */
+
+
 
 const App: React.FC = () => {
   /**
@@ -74,9 +78,13 @@ const App: React.FC = () => {
         setSuggestedMove(null);
         setSelectedPiece(null);
 
-        // Inform ChessTune server about the move
-        if (opponent === 'chesstune') {
-          await informChessTuneAboutMove(`${from}${to}`);
+        // Inform server about the move
+        if (opponent === 'chess_tune') {
+          const moveRequest: MoveRequest = { from, to, promotion: 'q' };
+          const serverResponse = await sendMoveToServer(moveRequest);
+          if (!serverResponse.success) {
+            console.warn('Server reported an issue:', serverResponse.error);
+          }
         }
 
         return result;
@@ -87,20 +95,26 @@ const App: React.FC = () => {
     return null; // Return null for invalid moves
   };
 
-  const informChessTuneAboutMove = async (move: string) => {
+  const sendMoveToServer = async (request: MoveRequest): Promise<MoveResponse> => {
     try {
-      const response = await fetch('http://localhost:3001/api/inform-chesstune', {
+      const response = await fetch('http://localhost:3001/api/move', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ move }),
+        body: JSON.stringify(request),
       });
+
+      const data: MoveResponse = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to inform ChessTune about the move');
+        throw new Error(data.success === false ? data.error : 'Failed to inform server about the move');
       }
+
+      return data;
     } catch (error) {
-      console.error('Error informing ChessTune about move:', error);
+      console.error('Error informing server about move:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
     }
   };
 
@@ -160,35 +174,31 @@ const App: React.FC = () => {
     return /^[a-h][1-8]$/.test(square);
   }
 
+  async function getMoveFromServer(request: GetMoveRequest): Promise<GetMoveResponse> {
+    const response = await fetch('http://localhost:3001/api/get_move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+    return response.json();
+  }
+
+
   async function requestMove() {
     try {
       console.log('Requesting move from server:', game.fen());
-      const response = await fetch('http://localhost:3001/api/move', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ board: game.fen(), opponent }),
-      });
-      const data = await response.json();
+      const response: GetMoveResponse = await getMoveFromServer({ board: game.fen(), opponent });
 
-      if (data.error) {
-        console.error('Server error:', data.error);
+      if ('error' in response) {
+        console.error('Server error:', response.error);
         return;
       }
 
-      if (!data.move || typeof data.move !== 'object') {
-        console.error('Invalid move data received from server:', data);
-        return;
-      }
-      console.log('Received move:', data.move);
+      // At this point, TypeScript knows response is SuccessfulGetMoveResponse
+      const { move, evaluation } = response;
+      console.log('Received move:', move);
 
-      const { from, to, promotion } = data.move;
-
-      if (!from || !to) {
-        console.error('Move data is missing "from" or "to" properties');
-        return;
-      }
+      const { from, to, promotion } = move;
 
       // Create a new Chess instance
       const newGame = new Chess(game.fen());
@@ -200,7 +210,7 @@ const App: React.FC = () => {
       const result = newGame.move({ from, to, promotion });
 
       if (result === null) {
-        console.error(`Invalid move: ${JSON.stringify(data.move)}`);
+        console.error(`Invalid move: ${JSON.stringify(move)}`);
         return;
       }
 
@@ -210,9 +220,7 @@ const App: React.FC = () => {
       setFullHistory(prevHistory => [...prevHistory, result.san]);
 
       // Update evaluation
-      if (data.evaluation !== undefined) {
-        setEvaluation(data.evaluation);
-      }
+      setEvaluation(evaluation);
 
       console.log('Move applied, new FEN:', newGame.fen());
 
@@ -252,7 +260,24 @@ const App: React.FC = () => {
     setMoveHistory(formattedHistory.trim());
   };
 
-  const startNewGame = () => {
+  const requestNewGame = async (opponent: string): Promise<NewGameResponse> => {
+    const request: NewGameRequest = { opponent };
+    const response = await fetch('http://localhost:3001/api/new_game', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+
+    return await response.json();
+  };
+
+  const startNewGame = async () => {
     const newGame = new Chess();
     setGame(newGame);
     setFen(newGame.fen());
@@ -261,7 +286,17 @@ const App: React.FC = () => {
     setFullHistory([]); // Clear the full history array
     setSuggestedMove(null);
     setSelectedPiece(null); // Reset the selected piece
-    // Reset any other relevant state variables
+
+    try {
+      const data = await requestNewGame(opponent);
+      if (data.success) {
+        console.log('Server informed about new game:', data.message);
+      } else {
+        console.warn('Server reported an error:', data.error);
+      }
+    } catch (error) {
+      console.error('Error informing server about new game:', error);
+    }
   };
 
   const highlightSuggestedMove = (move) => {

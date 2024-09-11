@@ -3,6 +3,9 @@ import cors from 'cors';
 import { Engine } from 'node-uci';
 import { Chess } from 'chess.js';
 import axios from 'axios'; // Make sure to install axios: npm install axios
+import { GetMoveRequest, GetMoveResponse } from '../../shared/types';
+import { NewGameRequest, NewGameResponse } from '../../shared/types';
+import { MoveResponse, MoveRequest } from '../../shared/types';
 
 // Initialize Express app and set port
 const app = express();
@@ -23,6 +26,9 @@ let searchDepth = 10; // Default search depth
 
 const CHESS_TUNE_URL = 'http://127.0.0.1:5000'; // Update this if the URL is different
 
+// Add this near the top of your file, after other initializations
+let currentOpponent: string | null = null;
+
 /**
  * Initialize the Stockfish chess engine.
  */
@@ -37,10 +43,19 @@ initializeEngine();
 
 /**
  * Set the search depth for the Stockfish engine.
- * POST /api/set-depth
+ * 
+ * This endpoint allows the client to adjust the search depth of the Stockfish chess engine.
+ * A deeper search generally results in stronger moves but takes more time to compute.
+ * 
+ * @route POST /api/set-depth
+ * @param {Object} req.body - The request body
+ * @param {number} req.body.depth - The desired search depth (must be a positive number)
+ * @returns {Object} JSON response indicating success or failure
+ * @returns {boolean} response.success - Indicates whether the depth was successfully set
+ * @returns {string} [response.error] - Error message if the depth setting failed
  */
 app.post('/api/set-depth', async (req, res) => {
-  const { depth } = req.body;
+  const { depth } = req.body as { depth: number };
   if (typeof depth === 'number' && depth > 0) {
     searchDepth = depth;
     await engine.setoption('Depth', depth.toString());
@@ -93,22 +108,54 @@ interface InfoItem {
 
 async function getChessTuneMove(board: string): Promise<{ move: any, evaluation: number }> {
   try {
+    // To get a move from ChessTune:
+    //
+    //   POST /make_ai_move
+    //   curl -X POST -H "Content-Type: application/json" -d '{"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}' http://localhost:5000/make_ai_move
+
     // Get the move from ChessTune
-    const response = await axios.get(`${CHESS_TUNE_URL}/get_move`);
+    const response = await axios.post(`${CHESS_TUNE_URL}/move`, {
+      fen: board
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
     const chessTuneMove = response.data.move;
+    const fen = response.data.fen;
 
-    // Convert the move to the format expected by the client
-    const chess = new Chess(board);
-    const moveObject = chess.move(chessTuneMove);
+    // Convert the received FEN to a chess board
+    const newBoard = new Chess(fen);
 
-    if (!moveObject) {
-      throw new Error('Invalid move suggested by ChessTune');
-    }
+    // Get evaluation from Stockfish for the new board position
+    const evaluation = await getStockfishEvaluation(newBoard.fen());
 
-    return { move: moveObject, evaluation: 0 }; // ChessTune doesn't provide evaluation
+    return { move: chessTuneMove, evaluation };
   } catch (error) {
     console.error('Error getting move from ChessTune:', error);
     throw error;
+  }
+}
+
+async function getStockfishEvaluation(board: string): Promise<number> {
+  try {
+    await engine.position(board);
+    const result = await engine.go({ depth: searchDepth });
+
+    // Parse the evaluation from Stockfish output
+    const lastItem = result.info[result.info.length - 1];
+    const lastInfo = typeof lastItem === 'object' ? lastItem as InfoItem : null;
+
+    if (lastInfo && lastInfo.score) {
+      return parseFloat(lastInfo.score.value) / 100;
+    } else {
+      console.error('Invalid or missing score information');
+      return 0;
+    }
+  } catch (error) {
+    console.error('Error getting evaluation from Stockfish:', error);
+    return 0;
   }
 }
 
@@ -116,7 +163,7 @@ async function getNextMove(board: string, opponent: string): Promise<{ move: any
   switch (opponent) {
     case 'stockfish':
       return getStockfishMove(board);
-    case 'chesstune':
+    case 'chess_tune':
       return getChessTuneMove(board);
     case 'human':
       throw new Error('Human moves should be handled client-side');
@@ -125,29 +172,24 @@ async function getNextMove(board: string, opponent: string): Promise<{ move: any
   }
 }
 
-/**
- * Get the next move from the selected opponent for a given board position.
- * POST /api/move
- */
-app.post('/api/move', async (req, res) => {
-  try {
-    const { board, opponent } = req.body;
-    console.log('Received board:', board);
-    console.log('Selected opponent:', opponent);
+// Use the interfaces in your route handler
+app.post<{}, GetMoveResponse, GetMoveRequest>('/api/get_move', async (req, res) => {
+  const { board } = req.body;
+  console.log('Received board:', board);
+  console.log('Selected opponent:', currentOpponent);
 
-    if (!board || !opponent) {
-      return res.status(400).json({ error: 'Board position and opponent are required' });
+  try {
+    if (!currentOpponent) {
+      throw new Error('No opponent selected. Please start a new game first.');
     }
 
-    const { move, evaluation } = await getNextMove(board, opponent);
+    const { move, evaluation } = await getNextMove(board, currentOpponent);
     res.json({ move, evaluation });
   } catch (error) {
-    console.error('Error in /api/move:', error);
-    if (error instanceof Error) {
-      res.status(500).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: "An unknown error occurred" });
-    }
+    console.error('Error in /api/get_move:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "An unknown error occurred"
+    });
   }
 });
 
@@ -198,22 +240,9 @@ app.post('/api/evaluate', async (req, res) => {
       return res.status(400).json({ error: 'Board position is required' });
     }
 
-    await engine.setoption('Depth', searchDepth.toString());
-    await engine.position(board);
-    const result = await engine.go({ depth: searchDepth });
-
-    // Parse the evaluation from Stockfish output
-    const lastItem = result.info[result.info.length - 1];
-    const lastInfo = typeof lastItem === 'object' ? lastItem as InfoItem : null;
-
-    if (lastInfo && lastInfo.score) {
-      const evaluation = parseFloat(lastInfo.score.value) / 100;
-      console.log('Evaluation:', evaluation);
-      res.json({ evaluation });
-    } else {
-      console.error('Invalid or missing score information');
-      res.status(500).json({ error: 'Unable to evaluate position' });
-    }
+    const evaluation = await getStockfishEvaluation(board);
+    console.log('Evaluation:', evaluation);
+    res.json({ evaluation });
   } catch (error) {
     console.error('Error in /api/evaluate:', error);
     if (error instanceof Error) {
@@ -243,16 +272,50 @@ async function applyMoveToChessTune(move: string) {
   }
 }
 
-app.post('/api/inform-chesstune', async (req, res) => {
+app.post<{}, MoveResponse, MoveRequest>('/api/move', async (req, res) => {
   try {
-    const { move } = req.body;
-    if (!move) {
-      return res.status(400).json({ error: 'Move is required' });
+    const { from, to, promotion } = req.body;
+    console.log('Received move from:', from, 'to:', to, 'for opponent:', currentOpponent);
+
+    if (currentOpponent === 'chess_tune') {
+      await applyMoveToChessTune(`${from}${to}`);
+      res.json({ success: true, message: 'Move applied to ChessTune successfully' });
+    } else {
+      res.json({ success: true, message: 'Move received successfully' });
     }
-    await applyMoveToChessTune(move);
-    res.json({ message: 'Move applied to ChessTune successfully' });
   } catch (error) {
-    console.error('Error informing ChessTune about move:', error);
-    res.status(500).json({ error: 'Failed to inform ChessTune about the move' });
+    console.error('Error processing move:', error);
+    res.status(500).json({ success: false, error: 'Failed to process the move' });
   }
+});
+
+// Update the new game route
+app.post<{}, NewGameResponse, NewGameRequest>('/api/new_game', async (req, res) => {
+  const { opponent } = req.body;
+  console.log('New game started with opponent:', opponent);
+
+  try {
+    // Store the opponent
+    currentOpponent = opponent;
+
+    // Reset the game state for the specified opponent
+    if (opponent === 'chess_tune') {
+      await axios.post(`${CHESS_TUNE_URL}/init`);
+    }
+    // Add any other opponent-specific reset logic here
+
+    // Reset the Stockfish engine
+    await engine.ucinewgame();
+
+    res.json({ success: true, message: `New game started with ${opponent}` });
+  } catch (error) {
+    console.error('Error starting new game:', error);
+    res.status(500).json({ success: false, error: 'Failed to start new game' });
+  }
+});
+
+// Add a route to end the game and reset the opponent
+app.post('/api/end_game', (req, res) => {
+  currentOpponent = null;
+  res.json({ success: true, message: 'Game ended and opponent reset' });
 });
