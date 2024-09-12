@@ -42,6 +42,7 @@ export interface MoveRequest {
   from: string;
   to: string;
   promotion?: string;
+  san: string; // Add the SAN move property
 }
 
 export interface SuccessfulMoveResponse {

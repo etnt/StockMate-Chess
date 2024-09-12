@@ -108,30 +108,46 @@ interface InfoItem {
 
 async function getChessTuneMove(board: string): Promise<{ move: any, evaluation: number }> {
   try {
-    // To get a move from ChessTune:
-    //
-    //   POST /make_ai_move
-    //   curl -X POST -H "Content-Type: application/json" -d '{"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"}' http://localhost:5000/make_ai_move
-
-    // Get the move from ChessTune
-    const response = await axios.post(`${CHESS_TUNE_URL}/move`, {
-      fen: board
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
+    // Make a GET request to the ChessTune '/get_move' endpoint
+    const response = await axios.get(`${CHESS_TUNE_URL}/get_move`, {
+      params: { fen: board }
     });
+    const data = response.data;
 
-    const chessTuneMove = response.data.move;
-    const fen = response.data.fen;
+    switch (data.status) {
+      case 'game_over':
+        console.log('Game over. Result:', data.result);
+        throw new Error(`Game over: ${data.result}`);
 
-    // Convert the received FEN to a chess board
-    const newBoard = new Chess(fen);
+      case 'ok':
+        console.log('Move received:', data.move);
+        // Convert SAN move to the format expected by the client
+        const chess = new Chess(board);
+        const moveObject = chess.move(data.move);
+        console.log('Move object:', moveObject);
+        if (!moveObject) {
+          throw new Error('Invalid move received from ChessTune');
+        }
 
-    // Get evaluation from Stockfish for the new board position
-    const evaluation = await getStockfishEvaluation(newBoard.fen());
+        // Get evaluation from Stockfish for the new board position
+        const evaluation = await getStockfishEvaluation(data.new_fen);
+        console.log('Evaluation:', evaluation);
 
-    return { move: chessTuneMove, evaluation };
+        return {
+          move: {
+            from: moveObject.from,
+            to: moveObject.to,
+            promotion: moveObject.promotion
+          },
+          evaluation
+        };
+
+      case 'error':
+        throw new Error(data.message || 'Unknown error from ChessTune');
+
+      default:
+        throw new Error('Unexpected response from ChessTune');
+    }
   } catch (error) {
     console.error('Error getting move from ChessTune:', error);
     throw error;
@@ -187,9 +203,13 @@ app.post<{}, GetMoveResponse, GetMoveRequest>('/api/get_move', async (req, res) 
     res.json({ move, evaluation });
   } catch (error) {
     console.error('Error in /api/get_move:', error);
-    res.status(500).json({
-      error: error instanceof Error ? error.message : "An unknown error occurred"
-    });
+    if (error instanceof Error && error.message.startsWith('Game over')) {
+      res.json({ error: error.message.split(': ')[1] });
+    } else {
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "An unknown error occurred"
+      });
+    }
   }
 });
 
@@ -274,18 +294,18 @@ async function applyMoveToChessTune(move: string) {
 
 app.post<{}, MoveResponse, MoveRequest>('/api/move', async (req, res) => {
   try {
-    const { from, to, promotion } = req.body;
+    const { from, to, promotion, san } = req.body;
     console.log('Received move from:', from, 'to:', to, 'for opponent:', currentOpponent);
 
     if (currentOpponent === 'chess_tune') {
-      await applyMoveToChessTune(`${from}${to}`);
-      res.json({ success: true, message: 'Move applied to ChessTune successfully' });
+      await applyMoveToChessTune(san);
+      res.json({ success: true, message: 'Move applied to ChessTune successfully' } as MoveResponse);
     } else {
-      res.json({ success: true, message: 'Move received successfully' });
+      res.json({ success: true, message: 'Move received successfully' } as MoveResponse);
     }
   } catch (error) {
     console.error('Error processing move:', error);
-    res.status(500).json({ success: false, error: 'Failed to process the move' });
+    res.status(500).json({ success: false, error: 'Failed to process the move' } as MoveResponse);
   }
 });
 

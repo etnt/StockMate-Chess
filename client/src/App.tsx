@@ -76,18 +76,18 @@ const App: React.FC = () => {
         setFen(gameCopy.fen());
         setFullHistory(prevHistory => [...prevHistory, result.san]);
         setSuggestedMove(null);
-        setSelectedPiece(null);
+        setSelectedPiece(null);  // Reset selectedPiece after a successful move
 
         // Inform server about the move
         if (opponent === 'chess_tune') {
-          const moveRequest: MoveRequest = { from, to, promotion: 'q' };
+          const moveRequest: MoveRequest = { from, to, promotion: 'q', san: result.san };
           const serverResponse = await sendMoveToServer(moveRequest);
           if (!serverResponse.success) {
             console.warn('Server reported an issue:', serverResponse.error);
           }
         }
 
-        return result;
+        return result.san; // Return the move in SAN format
       }
     } catch (error) {
       console.error('Invalid move:', error);
@@ -162,6 +162,11 @@ const App: React.FC = () => {
    * @returns {boolean} True if the move was legal and made, false otherwise.
    */
   function onPieceDrop(sourceSquare: string, targetSquare: string) {
+    if (selectedPiece !== null) {
+      // If a piece is already selected, it means onSquareClick will handle the move
+      return false;
+    }
+
     if (isValidSquare(sourceSquare) && isValidSquare(targetSquare)) {
       const result = makeAMove(sourceSquare as Square, targetSquare as Square);
       return result !== null;
