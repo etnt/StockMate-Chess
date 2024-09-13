@@ -45,21 +45,27 @@ const App: React.FC = () => {
   const boardSize = 600;
 
   const handleRegister = async (username: string, password: string) => {
+    console.log('Attempting to register user:', username);
     try {
       const response = await fetch('http://localhost:3001/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
+      console.log('Registration response status:', response.status);
       const data: AuthResponse = await response.json();
+      console.log('Registration response data:', data);
       if (data.success && data.token) {
         setUser(username);
         setToken(data.token);
+        console.log('Registration successful');
       } else {
         console.error('Registration failed:', data.error);
+        alert(`Registration failed: ${data.error}`);
       }
     } catch (error) {
       console.error('Registration error:', error);
+      alert(`Registration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -509,7 +515,10 @@ const App: React.FC = () => {
       ) : (
         <div className="auth-container">
           <LoginForm onLogin={handleLogin} />
-          <RegisterForm onRegister={handleRegister} />
+          <RegisterForm onRegister={(username, password) => {
+            console.log('Register attempt from App component');
+            handleRegister(username, password);
+          }} />
         </div>
       )}
     </div>

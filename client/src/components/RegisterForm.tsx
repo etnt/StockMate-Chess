@@ -10,6 +10,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onRegister }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Register form submitted with username:', username);
     onRegister(username, password);
   };
 
