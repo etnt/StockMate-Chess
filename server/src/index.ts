@@ -323,7 +323,7 @@ app.post<{}, AuthResponse, UserRegistrationRequest>('/api/register', async (req,
     console.log('New user created:', { id: newUser.id, username: newUser.username });
 
     // Generate access token
-    const accessToken = generateAccessToken(newUser);
+    const accessToken = generateAccessToken({ id: newUser.id, username: newUser.username });
     const refreshToken = jwt.sign({ userId: newUser.id }, REFRESH_TOKEN_SECRET);
     refreshTokens.push(refreshToken);
 
@@ -352,7 +352,7 @@ app.post<{}, AuthResponse, UserLoginRequest>('/api/login', async (req, res) => {
   }
 
   // Generate tokens
-  const accessToken = generateAccessToken(user);
+  const accessToken = generateAccessToken({ id: user.id, username: user.username });
   const refreshToken = jwt.sign({ userId: user.id }, REFRESH_TOKEN_SECRET);
   refreshTokens.push(refreshToken);
 
@@ -396,7 +396,7 @@ app.listen(port, () => {
 const users: User[] = [];
 
 // Helper function to generate access token
-function generateAccessToken(user: User) {
+function generateAccessToken(user: Pick<User, 'id' | 'username'>) {
   return jwt.sign({ userId: user.id, username: user.username }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
 }
 

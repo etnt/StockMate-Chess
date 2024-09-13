@@ -47,17 +47,9 @@
 
 .game-container {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-}
-
-.board-and-controls {
-  display: flex;
+  justify-content: space-between;
   align-items: flex-start;
   width: 100%;
-  max-width: 800px;
-  /* Adjust based on your board size plus some extra for the button */
 }
 
 .side-controls {
@@ -70,7 +62,6 @@
 
 .depth-selector {
   margin-bottom: 15px;
-  /* Remove the position: absolute */
 }
 
 .depth-selector label {
@@ -85,159 +76,66 @@
 }
 
 .new-game-button,
-.suggest-button {
-  padding: 10px 15px;
-  font-size: 16px;
-  cursor: pointer;
-  margin-bottom: 10px;
-}
-
-.board-and-evaluation {
-  display: flex;
-}
-
-.move-history-container {
-  width: 100%;
-  margin-top: 20px;
-}
-
-.move-history {
-  width: 100%;
-  height: 100px;
-  resize: vertical;
-  box-sizing: border-box;
-}
-
-.depth-selector {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.depth-selector label {
-  margin-right: 10px;
-  font-weight: bold;
-}
-
-.depth-selector select {
-  padding: 5px 10px;
-  font-size: 16px;
-  border: 2px solid #ccc;
-  border-radius: 4px;
-  background-color: white;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.depth-selector select:hover {
-  border-color: #888;
-}
-
-.depth-selector select:focus {
-  outline: none;
-  border-color: #4CAF50;
-  box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
-}
-
-.chess-board-container {
-  position: relative;
-  width: 400px;
-  margin: 0 auto;
-}
-
-.evaluation-score {
-  position: absolute;
-  top: -30px;
-  right: 0;
-  font-size: 14px;
-  font-weight: bold;
-}
-
-.new-game-button,
 .suggest-button,
 .go-back-button {
   padding: 10px 15px;
   font-size: 16px;
   cursor: pointer;
   margin-bottom: 10px;
-  width: 100%;
 }
 
-.go-back-button {
+.board-evaluation-history {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-and-evaluation {
+  display: flex;
+  align-items: flex-start;
+}
+
+.chess-board-container {
+  margin-right: 10px;  /* Add some space between the board and the evaluation bar */
+}
+
+.evaluation-bar {
+  width: 20px;  /* Adjust as needed */
+  height: 400px;  /* Match the height of your chess board */
   background-color: #f0f0f0;
-  color: #333;
+  margin-left: 10px;  /* Add some space between the board and the evaluation bar */
+}
+
+.move-history-container {
+  margin-top: 10px;
+  width: 420px;  /* Match the width of chess board (400px) + evaluation bar (20px) */
+}
+
+.move-history {
+  width: 100%;
+  height: 100px;  /* Adjust as needed */
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.online-players {
+  margin-left: 20px;
+  min-width: 200px;
   border: 1px solid #ccc;
-}
-
-.go-back-button:hover {
-  background-color: #e0e0e0;
-}
-
-.go-back-button:active {
-  background-color: #d0d0d0;
-}
-
-.welcome-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 30px;
-  width: 100%;
-}
-
-.welcome-message {
-  font-size: 1.5em;
-  margin: 0;
-  margin-right: 20px;
-  /* Add some space between the message and the button */
-}
-
-.logout-button {
-  padding: 5px 10px;
-  background-color: #f44336;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.logout-button:hover {
-  background-color: #d32f2f;
-}
-
-.auth-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  max-width: 300px;
-  margin: 0 auto;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-.auth-form input {
-  margin-bottom: 10px;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.auth-form button {
-  margin-top: 10px;  /* This adds space above the button */
   padding: 10px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  border-radius: 5px;
 }
 
-.auth-form button:hover {
-  background-color: #45a049;
+.online-players h3 {
+  margin-top: 0;
 }
+
+.online-players ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.online-players li {
+  margin-bottom: 5px;
+}
+
+/* ... rest of your styles ... */

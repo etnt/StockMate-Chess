@@ -545,7 +545,57 @@ const App: React.FC = () => {
             <button className="logout-button" onClick={handleLogout}>Logout</button>
           </div>
           <div className="game-container">
-            <div className="foyer">
+            <div className="side-controls">
+              <OpponentSelector
+                opponent={opponent}
+                setOpponent={setOpponent}
+              />
+              {opponent === 'stockfish' && (
+                <div className="depth-selector">
+                  <label htmlFor="depth-select">Stockfish Depth:</label>
+                  <select
+                    id="depth-select"
+                    value={searchDepth}
+                    onChange={(e) => {
+                      const newDepth = parseInt(e.target.value);
+                      setSearchDepth(newDepth);
+                      setStockfishDepth(newDepth);
+                    }}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
+                      <option key={depth} value={depth}>{depth}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <button className="new-game-button" onClick={startNewGame}>New Game</button>
+              <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
+              <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
+            </div>
+            <div className="board-evaluation-history">
+              <div className="board-and-evaluation">
+                <Chessboard
+                  position={fen}
+                  onPieceDrop={onPieceDrop}
+                  onSquareClick={onSquareClick}
+                  customSquareStyles={{
+                    ...(selectedPiece && { [selectedPiece]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' } }),
+                    ...(suggestedMove?.from && { [suggestedMove.from]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
+                    ...(suggestedMove?.to && { [suggestedMove.to]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
+                  }}
+                />
+                <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
+              </div>
+              <div className="move-history-container">
+                <textarea
+                  className="move-history"
+                  value={moveHistory}
+                  readOnly
+                  placeholder="Moves will appear here as they are made..."
+                />
+              </div>
+            </div>
+            <div className="online-players">
               <h3>Online Players</h3>
               <ul>
                 {onlineUsers.map(user => (
@@ -553,67 +603,12 @@ const App: React.FC = () => {
                 ))}
               </ul>
             </div>
-            <div className="board-and-controls">
-              <div className="side-controls">
-                <OpponentSelector
-                  opponent={opponent}
-                  setOpponent={setOpponent}
-                />
-                {opponent === 'stockfish' && (
-                  <div className="depth-selector">
-                    <label htmlFor="depth-select">Stockfish Depth:</label>
-                    <select
-                      id="depth-select"
-                      value={searchDepth}
-                      onChange={(e) => {
-                        const newDepth = parseInt(e.target.value);
-                        setSearchDepth(newDepth);
-                        setStockfishDepth(newDepth);
-                      }}
-                    >
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
-                        <option key={depth} value={depth}>{depth}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <button className="new-game-button" onClick={startNewGame}>New Game</button>
-                <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
-                <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
-              </div>
-              <div className="main-game-area">
-                <div className="board-and-evaluation">
-                  <Chessboard
-                    position={fen}
-                    onPieceDrop={onPieceDrop}
-                    onSquareClick={onSquareClick}
-                    customSquareStyles={{
-                      ...(selectedPiece && { [selectedPiece]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' } }),
-                      ...(suggestedMove?.from && { [suggestedMove.from]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
-                      ...(suggestedMove?.to && { [suggestedMove.to]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
-                    }}
-                  />
-                  <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
-                </div>
-                <div className="move-history-container">
-                  <textarea
-                    className="move-history"
-                    value={moveHistory}
-                    readOnly
-                    placeholder="Moves will appear here as they are made..."
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         </>
       ) : (
         <div className="auth-container">
           <LoginForm onLogin={handleLogin} />
-          <RegisterForm onRegister={(username, password) => {
-            console.log('Register attempt from App component');
-            handleRegister(username, password);
-          }} />
+          <RegisterForm onRegister={handleRegister} />
         </div>
       )}
     </div>

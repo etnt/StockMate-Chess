@@ -59,7 +59,7 @@ export type MoveResponse = SuccessfulMoveResponse | ErrorMoveResponse;
 
 /* User */
 export interface User {
-  id: number;
+  id: string;  // Changed from number to string
   username: string;
   password: string;
 }
