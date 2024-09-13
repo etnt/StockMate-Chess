@@ -278,10 +278,58 @@ app.get('/', (req, res) => {
   res.send('Hello from Chess Site Backend!');
 });
 
+// User registration route
+app.post<{}, AuthResponse, UserRegistrationRequest>('/api/register', async (req, res) => {
+  const { username, password } = req.body;
+  
+  // Check if user already exists
+  const existingUser = users.find(user => user.username === username);
+  if (existingUser) {
+    return res.status(400).json({ success: false, error: 'Username already exists' });
+  }
+
+  // Hash the password
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Create new user
+  const newUser: User = { id: users.length + 1, username, password: hashedPassword };
+  users.push(newUser);
+
+  // Generate JWT token
+  const token = jwt.sign({ userId: newUser.id }, 'your-secret-key', { expiresIn: '1h' });
+
+  res.json({ success: true, token });
+});
+
+// User login route
+app.post<{}, AuthResponse, UserLoginRequest>('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  
+  // Find user
+  const user = users.find(user => user.username === username);
+  if (!user) {
+    return res.status(400).json({ success: false, error: 'Invalid username or password' });
+  }
+
+  // Check password
+  const validPassword = await bcrypt.compare(password, user.password);
+  if (!validPassword) {
+    return res.status(400).json({ success: false, error: 'Invalid username or password' });
+  }
+
+  // Generate JWT token
+  const token = jwt.sign({ userId: user.id }, 'your-secret-key', { expiresIn: '1h' });
+
+  res.json({ success: true, token });
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
+
+// In-memory user storage (replace with a database in a real application)
+const users: User[] = [];
 
 async function applyMoveToChessTune(move: string) {
   try {

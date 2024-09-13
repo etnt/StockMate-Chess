@@ -56,3 +56,26 @@ export interface ErrorMoveResponse {
 }
 
 export type MoveResponse = SuccessfulMoveResponse | ErrorMoveResponse;
+
+/* User */
+export interface User {
+  id: number;
+  username: string;
+  password: string;
+}
+
+export interface UserRegistrationRequest {
+  username: string;
+  password: string;
+}
+
+export interface UserLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  token?: string;
+  error?: string;
+}

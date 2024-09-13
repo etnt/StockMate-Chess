@@ -5,6 +5,9 @@ import EvaluationBar from './components/EvaluationBar';
 import OpponentSelector from './components/OpponentSelector';
 import { GetMoveRequest, GetMoveResponse, SuccessfulGetMoveResponse } from '../../shared/types';
 import { MoveRequest, MoveResponse } from '../../shared/types';
+import { UserRegistrationRequest, UserLoginRequest, AuthResponse } from '../../shared/types';
+import LoginForm from './components/LoginForm';
+import RegisterForm from './components/RegisterForm';
 import './App.css';
 
 /**
@@ -28,25 +31,61 @@ import './App.css';
 
 
 const App: React.FC = () => {
-  /**
-   * The current state of the chess game.
-   * 
-   * This state is managed using the useState hook and contains an instance of the Chess class
-   * from the chess.js library. The Chess instance represents the current state of the game,
-   * including piece positions, whose turn it is, and game history.
-   * 
-   * @type {Chess}
-   */
   const [game, setGame] = useState<Chess>(new Chess());
   const [fen, setFen] = useState(game.fen());
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [moveHistory, setMoveHistory] = useState('');
   const [fullHistory, setFullHistory] = useState<string[]>([]);
-  const [searchDepth, setSearchDepth] = useState<number>(10); // Default depth
+  const [searchDepth, setSearchDepth] = useState<number>(10);
   const [evaluation, setEvaluation] = useState(0);
   const [suggestedMove, setSuggestedMove] = useState(null);
   const [opponent, setOpponent] = useState<string>('stockfish');
+  const [user, setUser] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const boardSize = 600;
+
+  const handleRegister = async (username: string, password: string) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data: AuthResponse = await response.json();
+      if (data.success && data.token) {
+        setUser(username);
+        setToken(data.token);
+      } else {
+        console.error('Registration failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+    }
+  };
+
+  const handleLogin = async (username: string, password: string) => {
+    try {
+      const response = await fetch('http://localhost:3001/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data: AuthResponse = await response.json();
+      if (data.success && data.token) {
+        setUser(username);
+        setToken(data.token);
+      } else {
+        console.error('Login failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setToken(null);
+  };
 
   // Update move history whenever the game state changes
   useEffect(() => {
@@ -408,60 +447,71 @@ const App: React.FC = () => {
   return (
     <div className="App">
       <h1>StockMate Chess</h1>
-      <div className="game-container">
-        <div className="board-and-controls">
-          <div className="side-controls">
-            <OpponentSelector
-              opponent={opponent}
-              setOpponent={setOpponent}
-            />
-            {opponent === 'stockfish' && (
-              <div className="depth-selector">
-                <label htmlFor="depth-select">Stockfish Depth:</label>
-                <select
-                  id="depth-select"
-                  value={searchDepth}
-                  onChange={(e) => {
-                    const newDepth = parseInt(e.target.value);
-                    setSearchDepth(newDepth);
-                    setStockfishDepth(newDepth);
-                  }}
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
-                    <option key={depth} value={depth}>{depth}</option>
-                  ))}
-                </select>
+      {user ? (
+        <>
+          <p>Welcome, {user}!</p>
+          <button onClick={handleLogout}>Logout</button>
+          <div className="game-container">
+            <div className="board-and-controls">
+              <div className="side-controls">
+                <OpponentSelector
+                  opponent={opponent}
+                  setOpponent={setOpponent}
+                />
+                {opponent === 'stockfish' && (
+                  <div className="depth-selector">
+                    <label htmlFor="depth-select">Stockfish Depth:</label>
+                    <select
+                      id="depth-select"
+                      value={searchDepth}
+                      onChange={(e) => {
+                        const newDepth = parseInt(e.target.value);
+                        setSearchDepth(newDepth);
+                        setStockfishDepth(newDepth);
+                      }}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(depth => (
+                        <option key={depth} value={depth}>{depth}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <button className="new-game-button" onClick={startNewGame}>New Game</button>
+                <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
+                <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
               </div>
-            )}
-            <button className="new-game-button" onClick={startNewGame}>New Game</button>
-            <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
-            <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
-          </div>
-          <div className="main-game-area">
-            <div className="board-and-evaluation">
-              <Chessboard
-                position={fen}
-                onPieceDrop={onPieceDrop}
-                onSquareClick={onSquareClick}
-                customSquareStyles={{
-                  ...(selectedPiece && { [selectedPiece]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' } }),
-                  ...(suggestedMove?.from && { [suggestedMove.from]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
-                  ...(suggestedMove?.to && { [suggestedMove.to]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
-                }}
-              />
-              <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
-            </div>
-            <div className="move-history-container">
-              <textarea
-                className="move-history"
-                value={moveHistory}
-                readOnly
-                placeholder="Moves will appear here as they are made..."
-              />
+              <div className="main-game-area">
+                <div className="board-and-evaluation">
+                  <Chessboard
+                    position={fen}
+                    onPieceDrop={onPieceDrop}
+                    onSquareClick={onSquareClick}
+                    customSquareStyles={{
+                      ...(selectedPiece && { [selectedPiece]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' } }),
+                      ...(suggestedMove?.from && { [suggestedMove.from]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
+                      ...(suggestedMove?.to && { [suggestedMove.to]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),
+                    }}
+                  />
+                  <EvaluationBar evaluation={evaluation} boardHeight={boardSize} />
+                </div>
+                <div className="move-history-container">
+                  <textarea
+                    className="move-history"
+                    value={moveHistory}
+                    readOnly
+                    placeholder="Moves will appear here as they are made..."
+                  />
+                </div>
+              </div>
             </div>
           </div>
+        </>
+      ) : (
+        <div className="auth-container">
+          <LoginForm onLogin={handleLogin} />
+          <RegisterForm onRegister={handleRegister} />
         </div>
-      </div>
+      )}
     </div>
   );
 };
