@@ -2,10 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import { Engine } from 'node-uci';
 import { Chess } from 'chess.js';
-import axios from 'axios'; // Make sure to install axios: npm install axios
+import axios from 'axios';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { GetMoveRequest, GetMoveResponse } from '../../shared/types';
 import { NewGameRequest, NewGameResponse } from '../../shared/types';
 import { MoveResponse, MoveRequest } from '../../shared/types';
+import { User, UserLoginRequest, UserRegistrationRequest, AuthResponse } from '../../shared/types';
 
 // Initialize Express app and set port
 const app = express();
