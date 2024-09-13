@@ -17,11 +17,18 @@ const port = process.env.PORT || 3001;
 // Configure CORS for the Express app
 app.use(cors({
   origin: 'http://localhost:3000',
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
+
+// Add a middleware to log all incoming requests
+app.use((req, res, next) => {
+  console.log(`Received ${req.method} request to ${req.url}`);
+  console.log('Request body:', req.body);
+  next();
+});
 
 // Initialize Stockfish engine
 let engine: Engine;
@@ -283,25 +290,37 @@ app.get('/', (req, res) => {
 
 // User registration route
 app.post<{}, AuthResponse, UserRegistrationRequest>('/api/register', async (req, res) => {
+  console.log('Received registration request');
   const { username, password } = req.body;
   
+  console.log('Registration attempt for username:', username);
+
   // Check if user already exists
   const existingUser = users.find(user => user.username === username);
   if (existingUser) {
+    console.log('Registration failed: Username already exists');
     return res.status(400).json({ success: false, error: 'Username already exists' });
   }
 
-  // Hash the password
-  const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Create new user
-  const newUser: User = { id: users.length + 1, username, password: hashedPassword };
-  users.push(newUser);
+    // Create new user
+    const newUser: User = { id: users.length + 1, username, password: hashedPassword };
+    users.push(newUser);
 
-  // Generate JWT token
-  const token = jwt.sign({ userId: newUser.id }, 'your-secret-key', { expiresIn: '1h' });
+    console.log('New user created:', { id: newUser.id, username: newUser.username });
 
-  res.json({ success: true, token });
+    // Generate JWT token
+    const token = jwt.sign({ userId: newUser.id }, 'your-secret-key', { expiresIn: '1h' });
+
+    console.log('Registration successful, token generated');
+    res.json({ success: true, token });
+  } catch (error) {
+    console.error('Error during registration:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 // User login route
