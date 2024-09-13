@@ -16,6 +16,7 @@
   "dependencies": {
     "@types/chess.js": "^0.13.7",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.12",
     "bcrypt": "^5.1.1",
     "chess.js": "^1.0.0-beta.8",
     "concurrently": "^6.2.0",
@@ -25,7 +26,8 @@
     "path": "^0.12.7",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

@@ -13,9 +13,13 @@ import { User, UserLoginRequest, UserRegistrationRequest, AuthResponse, RefreshT
 import { initializeDatabase } from './database';
 import { createUser, getUser, updateElo } from './database/models/User';
 import { addGame, getGames } from './database/models/Game';
+import http from 'http';
+import WebSocket from 'ws';
 
 // Initialize Express app and set port
 const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 const port = process.env.PORT || 3001;
 
 // Configure CORS for the Express app
@@ -34,7 +38,7 @@ const REFRESH_TOKEN_SECRET = 'your_refresh_token_secret';
 
 // In-memory storage for refresh tokens and online users (replace with a database in production)
 let refreshTokens: string[] = [];
-let onlineUsers: User[] = [];
+const onlineUsers: { [key: string]: { id: string, username: string } } = {};
 
 // Add a middleware to log all incoming requests
 app.use((req, res, next) => {
@@ -342,6 +346,9 @@ app.post<{}, AuthResponse, UserLoginRequest>('/api/login', async (req, res) => {
       const refreshToken = jwt.sign({ userId: user.id, username }, REFRESH_TOKEN_SECRET);
       console.log('Tokens generated for user:', username);
       res.json({ success: true, accessToken, refreshToken, username: user.username, elo: user.elo_rating });
+      // Broadcast updated online users list
+      onlineUsers[req.body.username] = { id: user.id, username: user.username };
+      broadcastOnlineUsers();
     } else {
       console.log('Login failed for user:', username);
       res.status(401).json({ success: false, error: 'Invalid credentials' });
@@ -366,19 +373,25 @@ app.post<{}, AuthResponse, RefreshTokenRequest>('/api/token', (req, res) => {
 });
 
 // Logout route
-app.post('/api/logout', (req, res) => {
-  const { refreshToken } = req.body;
-  refreshTokens = refreshTokens.filter(token => token !== refreshToken);
-  res.sendStatus(204);
+app.post('/api/logout', authenticateToken, (req: any, res) => {
+  const username = req.user.username;
+  // Remove user from online users
+  const userIdToRemove = Object.keys(onlineUsers).find(key => onlineUsers[key].username === username);
+  if (userIdToRemove) {
+    delete onlineUsers[userIdToRemove];
+    broadcastOnlineUsers();
+  }
+  res.json({ success: true, message: 'Logged out successfully' });
 });
 
 // Get online users
 app.get('/api/online-users', authenticateToken, (req, res) => {
-  res.json(onlineUsers.map(user => ({ id: user.id, username: user.username })));
+  const users = Object.values(onlineUsers);
+  res.json(users);
 });
 
 // Start the server
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
@@ -484,6 +497,47 @@ app.get('/api/user', authenticateToken, async (req: any, res) => {
     res.status(500).json({ success: false, error: 'Error fetching user data' });
   }
 });
+
+wss.on('connection', (ws: WebSocket) => {
+  const userId = uuidv4();
+  let username: string | null = null;
+  
+  ws.on('message', (message: string) => {
+    const data = JSON.parse(message);
+    if (data.type === 'login' && typeof data.username === 'string') {
+      // Remove the user if they were already logged in
+      if (username) {
+        delete onlineUsers[userId];
+      }
+      username = data.username;
+      onlineUsers[userId] = { id: userId, username: data.username };
+      broadcastOnlineUsers();
+    } else if (data.type === 'logout') {
+      if (username) {
+        delete onlineUsers[userId];
+        username = null;
+        broadcastOnlineUsers();
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    if (username) {
+      delete onlineUsers[userId];
+      broadcastOnlineUsers();
+    }
+  });
+});
+
+function broadcastOnlineUsers() {
+  const users = Object.values(onlineUsers);
+  const message = JSON.stringify({ type: 'onlineUsers', users });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
 
 initializeDatabase().then(() => {
   console.log('Database initialized');

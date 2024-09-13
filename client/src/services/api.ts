@@ -53,7 +53,10 @@ export const register = async (username: string, password: string) => {
   }
 };
 
-export const logout = () => {
+export const logout = (ws: WebSocket | null) => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'logout' }));
+  }
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
 };

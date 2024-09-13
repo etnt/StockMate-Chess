@@ -86,3 +86,8 @@ export interface AuthResponse {
 export interface RefreshTokenRequest {
   refreshToken: string;
 }
+
+export interface OnlineUser {
+  id: string;
+  username: string;
+}

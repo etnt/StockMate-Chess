@@ -5,7 +5,7 @@ import EvaluationBar from './components/EvaluationBar';
 import OpponentSelector from './components/OpponentSelector';
 import { GetMoveRequest, GetMoveResponse, SuccessfulGetMoveResponse } from '../../shared/types';
 import { MoveRequest, MoveResponse } from '../../shared/types';
-import { User } from '../../shared/types';
+import { User, OnlineUser } from '../../shared/types';  // Adjust the import path as necessary
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import './App.css';
@@ -24,7 +24,8 @@ const App: React.FC = () => {
   const [evaluation, setEvaluation] = useState(0);
   const [suggestedMove, setSuggestedMove] = useState(null);
   const [opponent, setOpponent] = useState<string>('stockfish');
-  const [onlineUsers, setOnlineUsers] = useState<{ id: string, username: string }[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [ws, setWs] = useState<WebSocket | null>(null);
   const boardSize = 600;
 
   useEffect(() => {
@@ -33,6 +34,34 @@ const App: React.FC = () => {
       fetchUserData();
     }
   }, []);
+
+  useEffect(() => {
+    const socket = new WebSocket('ws://localhost:3001');
+    setWs(socket);
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'onlineUsers') {
+        // Filter out the current user and remove duplicates
+        const filteredUsers = data.users.filter((onlineUser: OnlineUser) => 
+          onlineUser.username !== user?.username
+        );
+        const uniqueUsers = filteredUsers.reduce((acc: OnlineUser[], current: OnlineUser) => {
+          const x = acc.find(item => item.username === current.username);
+          if (!x) {
+            return acc.concat([current]);
+          } else {
+            return acc;
+          }
+        }, []);
+        setOnlineUsers(uniqueUsers);
+      }
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [user]); // Add user as a dependency
 
   const fetchUserData = async () => {
     try {
@@ -53,6 +82,9 @@ const App: React.FC = () => {
         console.log('Login successful, fetching user data');  // Add this line
         await fetchUserData();
         console.log('User data fetched');  // Add this line
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'login', username: data.username }));
+        }
       } else {
         throw new Error(data.error || 'Login failed');
       }
@@ -77,36 +109,10 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    logout();
+    logout(ws);
     setUser(null);
+    setOnlineUsers([]); // Clear the online users list
   };
-
-  useEffect(() => {
-    const fetchOnlineUsers = async () => {
-      if (user) {
-        try {
-          const response = await fetch('http://localhost:3001/api/online-users', {
-            headers: {
-              'Authorization': `Bearer ${user.accessToken}`
-            }
-          });
-          if (response.ok) {
-            const users = await response.json();
-            setOnlineUsers(users);
-          } else {
-            console.error('Failed to fetch online users');
-          }
-        } catch (error) {
-          console.error('Error fetching online users:', error);
-        }
-      }
-    };
-
-    fetchOnlineUsers();
-    const interval = setInterval(fetchOnlineUsers, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [user]);
 
   // Update move history whenever the game state changes
   useEffect(() => {
@@ -527,11 +533,15 @@ const App: React.FC = () => {
             </div>
             <div className="online-players">
               <h3>Online Players</h3>
-              <ul>
-                {onlineUsers.map(user => (
-                  <li key={user.id}>{user.username}</li>
-                ))}
-              </ul>
+              {onlineUsers.length > 0 ? (
+                <ul>
+                  {onlineUsers.map((onlineUser) => (
+                    <li key={onlineUser.id}>{onlineUser.username}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No other players online</p>
+              )}
             </div>
           </div>
         </>
