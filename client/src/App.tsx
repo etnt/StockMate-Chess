@@ -10,26 +10,6 @@ import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import './App.css';
 
-/**
- * Chess Game Application
- * 
- * This React component implements a chess game using the react-chessboard library
- * and the chess.js library for game logic.
- * 
- * Key features:
- * - Uses useState to manage the game state
- * - Implements makeAMove function to update the game state
- * - Implements onDrop function to handle piece movements
- * - Renders a chessboard using the Chessboard component from react-chessboard
- * 
- * The game allows players to make moves by dragging and dropping pieces.
- * It automatically promotes pawns to queens for simplicity.
- * 
- * @component
- */
-
-
-
 const App: React.FC = () => {
   const [game, setGame] = useState<Chess>(new Chess());
   const [fen, setFen] = useState(game.fen());
@@ -41,8 +21,37 @@ const App: React.FC = () => {
   const [suggestedMove, setSuggestedMove] = useState(null);
   const [opponent, setOpponent] = useState<string>('stockfish');
   const [user, setUser] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<{id: string, username: string}[]>([]);
   const boardSize = 600;
+
+  useEffect(() => {
+    const fetchOnlineUsers = async () => {
+      if (accessToken) {
+        try {
+          const response = await fetch('http://localhost:3001/api/online-users', {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`
+            }
+          });
+          if (response.ok) {
+            const users = await response.json();
+            setOnlineUsers(users);
+          } else {
+            console.error('Failed to fetch online users');
+          }
+        } catch (error) {
+          console.error('Error fetching online users:', error);
+        }
+      }
+    };
+
+    fetchOnlineUsers();
+    const interval = setInterval(fetchOnlineUsers, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [accessToken]);
 
   const handleRegister = async (username: string, password: string) => {
     console.log('Attempting to register user:', username);
@@ -53,15 +62,16 @@ const App: React.FC = () => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        credentials: 'include', // This is important for cookies, if you're using them
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
       console.log('Registration response status:', response.status);
       const data: AuthResponse = await response.json();
       console.log('Registration response data:', data);
-      if (data.success && data.token) {
+      if (data.success && data.accessToken && data.refreshToken) {
         setUser(username);
-        setToken(data.token);
+        setAccessToken(data.accessToken);
+        setRefreshToken(data.refreshToken);
         console.log('Registration successful');
       } else {
         console.error('Registration failed:', data.error);
@@ -81,13 +91,14 @@ const App: React.FC = () => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        credentials: 'include', // This is important for cookies, if you're using them
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
       const data: AuthResponse = await response.json();
-      if (data.success && data.token) {
+      if (data.success && data.accessToken && data.refreshToken) {
         setUser(username);
-        setToken(data.token);
+        setAccessToken(data.accessToken);
+        setRefreshToken(data.refreshToken);
       } else {
         console.error('Login failed:', data.error);
       }
@@ -96,9 +107,75 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setToken(null);
+  const handleLogout = async () => {
+    try {
+      await fetch('http://localhost:3001/api/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+      setUser(null);
+      setAccessToken(null);
+      setRefreshToken(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const refreshAccessToken = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+      const data: AuthResponse = await response.json();
+      if (data.success && data.accessToken) {
+        setAccessToken(data.accessToken);
+        return data.accessToken;
+      } else {
+        throw new Error('Failed to refresh token');
+      }
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      setUser(null);
+      setAccessToken(null);
+      setRefreshToken(null);
+      throw error;
+    }
+  };
+
+  const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
+    if (!accessToken) {
+      throw new Error('No access token available');
+    }
+
+    const authOptions = {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    };
+
+    let response = await fetch(url, authOptions);
+
+    if (response.status === 403) {
+      // Token might be expired, try to refresh it
+      const newToken = await refreshAccessToken();
+      authOptions.headers['Authorization'] = `Bearer ${newToken}`;
+      response = await fetch(url, authOptions);
+    }
+
+    if (!response.ok) {
+      throw new Error('Request failed');
+    }
+
+    return response;
   };
 
   // Update move history whenever the game state changes
@@ -465,8 +542,17 @@ const App: React.FC = () => {
         <>
           <div className="welcome-container">
             <h2 className="welcome-message">Welcome {user}!</h2>
-            <button className="logout-button" onClick={handleLogout}>Logout</button>          </div>
+            <button className="logout-button" onClick={handleLogout}>Logout</button>
+          </div>
           <div className="game-container">
+            <div className="foyer">
+              <h3>Online Players</h3>
+              <ul>
+                {onlineUsers.map(user => (
+                  <li key={user.id}>{user.username}</li>
+                ))}
+              </ul>
+            </div>
             <div className="board-and-controls">
               <div className="side-controls">
                 <OpponentSelector

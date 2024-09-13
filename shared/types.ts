@@ -76,6 +76,11 @@ export interface UserLoginRequest {
 
 export interface AuthResponse {
   success: boolean;
-  token?: string;
+  accessToken?: string;
+  refreshToken?: string;
   error?: string;
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string;
 }

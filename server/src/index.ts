@@ -5,10 +5,11 @@ import { Chess } from 'chess.js';
 import axios from 'axios';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 import { GetMoveRequest, GetMoveResponse } from '../../shared/types';
 import { NewGameRequest, NewGameResponse } from '../../shared/types';
 import { MoveResponse, MoveRequest } from '../../shared/types';
-import { User, UserLoginRequest, UserRegistrationRequest, AuthResponse } from '../../shared/types';
+import { User, UserLoginRequest, UserRegistrationRequest, AuthResponse, RefreshTokenRequest } from '../../shared/types';
 
 // Initialize Express app and set port
 const app = express();
@@ -23,6 +24,14 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Secret keys for JWT
+const ACCESS_TOKEN_SECRET = 'your_access_token_secret';
+const REFRESH_TOKEN_SECRET = 'your_refresh_token_secret';
+
+// In-memory storage for refresh tokens and online users (replace with a database in production)
+let refreshTokens: string[] = [];
+let onlineUsers: User[] = [];
 
 // Add a middleware to log all incoming requests
 app.use((req, res, next) => {
@@ -308,16 +317,18 @@ app.post<{}, AuthResponse, UserRegistrationRequest>('/api/register', async (req,
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
-    const newUser: User = { id: users.length + 1, username, password: hashedPassword };
+    const newUser: User = { id: uuidv4(), username, password: hashedPassword };
     users.push(newUser);
 
     console.log('New user created:', { id: newUser.id, username: newUser.username });
 
-    // Generate JWT token
-    const token = jwt.sign({ userId: newUser.id }, 'your-secret-key', { expiresIn: '1h' });
+    // Generate access token
+    const accessToken = generateAccessToken(newUser);
+    const refreshToken = jwt.sign({ userId: newUser.id }, REFRESH_TOKEN_SECRET);
+    refreshTokens.push(refreshToken);
 
-    console.log('Registration successful, token generated');
-    res.json({ success: true, token });
+    console.log('Registration successful, tokens generated');
+    res.json({ success: true, accessToken, refreshToken });
   } catch (error) {
     console.error('Error during registration:', error);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -340,10 +351,40 @@ app.post<{}, AuthResponse, UserLoginRequest>('/api/login', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid username or password' });
   }
 
-  // Generate JWT token
-  const token = jwt.sign({ userId: user.id }, 'your-secret-key', { expiresIn: '1h' });
+  // Generate tokens
+  const accessToken = generateAccessToken(user);
+  const refreshToken = jwt.sign({ userId: user.id }, REFRESH_TOKEN_SECRET);
+  refreshTokens.push(refreshToken);
 
-  res.json({ success: true, token });
+  // Add user to online users
+  onlineUsers.push(user);
+
+  res.json({ success: true, accessToken, refreshToken });
+});
+
+// Token refresh route
+app.post<{}, AuthResponse, RefreshTokenRequest>('/api/token', (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.sendStatus(401);
+  if (!refreshTokens.includes(refreshToken)) return res.sendStatus(403);
+
+  jwt.verify(refreshToken, REFRESH_TOKEN_SECRET, (err: any, user: any) => {
+    if (err) return res.sendStatus(403);
+    const accessToken = generateAccessToken({ id: user.userId, username: user.username });
+    res.json({ success: true, accessToken });
+  });
+});
+
+// Logout route
+app.post('/api/logout', (req, res) => {
+  const { refreshToken } = req.body;
+  refreshTokens = refreshTokens.filter(token => token !== refreshToken);
+  res.sendStatus(204);
+});
+
+// Get online users
+app.get('/api/online-users', authenticateToken, (req, res) => {
+  res.json(onlineUsers.map(user => ({ id: user.id, username: user.username })));
 });
 
 // Start the server
@@ -353,6 +394,24 @@ app.listen(port, () => {
 
 // In-memory user storage (replace with a database in a real application)
 const users: User[] = [];
+
+// Helper function to generate access token
+function generateAccessToken(user: User) {
+  return jwt.sign({ userId: user.id, username: user.username }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
+}
+
+// Middleware to authenticate token
+function authenticateToken(req: any, res: any, next: any) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, ACCESS_TOKEN_SECRET, (err: any, user: any) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+}
 
 async function applyMoveToChessTune(move: string) {
   try {
