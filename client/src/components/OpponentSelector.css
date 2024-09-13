@@ -1,0 +1,13 @@
+.opponent-selector {
+  padding-bottom: 15px; /* Adjust this value as needed */
+}
+
+.opponent-selector label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.opponent-selector select {
+  width: 100%;
+  padding: 5px;
+}

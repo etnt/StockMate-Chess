@@ -49,7 +49,11 @@ const App: React.FC = () => {
     try {
       const response = await fetch('http://localhost:3001/api/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include', // This is important for cookies, if you're using them
         body: JSON.stringify({ username, password }),
       });
       console.log('Registration response status:', response.status);
@@ -73,7 +77,11 @@ const App: React.FC = () => {
     try {
       const response = await fetch('http://localhost:3001/api/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include', // This is important for cookies, if you're using them
         body: JSON.stringify({ username, password }),
       });
       const data: AuthResponse = await response.json();
@@ -455,8 +463,9 @@ const App: React.FC = () => {
       <h1>StockMate Chess</h1>
       {user ? (
         <>
-          <p>Welcome, {user}!</p>
-          <button onClick={handleLogout}>Logout</button>
+          <div className="welcome-container">
+            <h2 className="welcome-message">Welcome {user}!</h2>
+            <button className="logout-button" onClick={handleLogout}>Logout</button>          </div>
           <div className="game-container">
             <div className="board-and-controls">
               <div className="side-controls">
