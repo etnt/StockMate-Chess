@@ -4,9 +4,12 @@
 }
 
 .App h1 {
-  font-size: 2.5em;  /* Increase this value for a larger header */
-  margin-bottom: 30px;  /* Add some space below the header */
-  color: #333;  /* Optional: adjust color as needed */
+  font-size: 2.5em;
+  /* Increase this value for a larger header */
+  margin-bottom: 30px;
+  /* Add some space below the header */
+  color: #333;
+  /* Optional: adjust color as needed */
 }
 
 .App-logo {
@@ -47,16 +50,21 @@
 
 .game-container {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: flex-start;
   width: 100%;
+  max-width: 1200px;
+  /* Adjust this value as needed */
+  margin: 0 auto;
+  /* Center the game container */
 }
 
 .side-controls {
   display: flex;
   flex-direction: column;
   margin-right: 20px;
-  min-width: 150px;
+  width: 150px;
+  /* Fixed width */
   /* Ensure there's enough width for the controls */
 }
 
@@ -87,6 +95,8 @@
 .board-evaluation-history {
   display: flex;
   flex-direction: column;
+  width: 420px;
+  /* Fixed width to match chess board + evaluation bar */
 }
 
 .board-and-evaluation {
@@ -95,31 +105,37 @@
 }
 
 .chess-board-container {
-  margin-right: 10px;  /* Add some space between the board and the evaluation bar */
+  width: 400px;
+  /* Match the width of your Chessboard component */
 }
 
 .evaluation-bar {
-  width: 20px;  /* Adjust as needed */
-  height: 400px;  /* Match the height of your chess board */
+  width: 20px;
+  /* Adjust as needed */
+  height: 400px;
+  /* Match the height of your chess board */
   background-color: #f0f0f0;
-  margin-left: 10px;  /* Add some space between the board and the evaluation bar */
+  margin-left: 10px;
+  /* Add some space between the board and the evaluation bar */
 }
 
 .move-history-container {
   margin-top: 10px;
-  width: 420px;  /* Match the width of chess board (400px) + evaluation bar (20px) */
+  width: 100%;
 }
 
 .move-history {
   width: 100%;
-  height: 100px;  /* Adjust as needed */
+  height: 100px;
+  /* Adjust as needed */
   resize: vertical;
   box-sizing: border-box;
 }
 
 .online-players {
-  margin-left: 20px;
-  min-width: 200px;
+  margin-left: 200px;
+  width: 150px;
+  /* Fixed width */
   border: 1px solid #ccc;
   padding: 10px;
   border-radius: 5px;
@@ -136,6 +152,35 @@
 
 .online-players li {
   margin-bottom: 5px;
+}
+
+/* ... rest of your styles ... */
+
+.welcome-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.welcome-message {
+  font-size: 1.5em;
+  margin: 0;
+  margin-right: 20px;  /* Add some space between the message and the button */
+}
+
+.logout-button {
+  padding: 5px 10px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: #f44336;  /* Red color for logout button */
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
+
+.logout-button:hover {
+  background-color: #d32f2f;  /* Darker red on hover */
 }
 
 /* ... rest of your styles ... */
