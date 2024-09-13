@@ -59,9 +59,9 @@ export type MoveResponse = SuccessfulMoveResponse | ErrorMoveResponse;
 
 /* User */
 export interface User {
-  id: string;  // Changed from number to string
+  id: string;
   username: string;
-  password: string;
+  elo: number;
 }
 
 export interface UserRegistrationRequest {
@@ -78,6 +78,8 @@ export interface AuthResponse {
   success: boolean;
   accessToken?: string;
   refreshToken?: string;
+  username?: string;
+  elo?: number;
   error?: string;
 }
 

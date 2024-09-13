@@ -5,13 +5,17 @@ import EvaluationBar from './components/EvaluationBar';
 import OpponentSelector from './components/OpponentSelector';
 import { GetMoveRequest, GetMoveResponse, SuccessfulGetMoveResponse } from '../../shared/types';
 import { MoveRequest, MoveResponse } from '../../shared/types';
-import { UserRegistrationRequest, UserLoginRequest, AuthResponse } from '../../shared/types';
+import { User } from '../../shared/types';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import './App.css';
+import { login, register, logout, getUserData } from './services/api';
+
+
 
 const App: React.FC = () => {
-  const [game, setGame] = useState<Chess>(new Chess());
+  const [user, setUser] = useState<User | null>(null);
+  const [game, setGame] = useState(new Chess());
   const [fen, setFen] = useState(game.fen());
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [moveHistory, setMoveHistory] = useState('');
@@ -20,19 +24,70 @@ const App: React.FC = () => {
   const [evaluation, setEvaluation] = useState(0);
   const [suggestedMove, setSuggestedMove] = useState(null);
   const [opponent, setOpponent] = useState<string>('stockfish');
-  const [user, setUser] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
-  const [onlineUsers, setOnlineUsers] = useState<{id: string, username: string}[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<{ id: string, username: string }[]>([]);
   const boardSize = 600;
 
   useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      fetchUserData();
+    }
+  }, []);
+
+  const fetchUserData = async () => {
+    try {
+      const userData = await getUserData();
+      console.log('Fetched user data:', userData);  // Add this line
+      setUser(userData);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      handleLogout();
+    }
+  };
+
+  const handleLogin = async (username: string, password: string) => {
+    try {
+      const data = await login(username, password);
+      console.log('Login data:', data);  // Add this line
+      if (data.success) {
+        console.log('Login successful, fetching user data');  // Add this line
+        await fetchUserData();
+        console.log('User data fetched');  // Add this line
+      } else {
+        throw new Error(data.error || 'Login failed');
+      }
+    } catch (error) {
+      console.error('Login failed:', error.message);
+      throw error;
+    }
+  };
+
+  const handleRegister = async (username: string, password: string) => {
+    try {
+      const data = await register(username, password);
+      if (data.success) {
+        fetchUserData();
+      } else {
+        throw new Error(data.error || 'Registration failed');
+      }
+    } catch (error) {
+      console.error('Registration failed:', error.message);
+      throw error; // Re-throw the error so it can be caught by the RegisterForm
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+  };
+
+  useEffect(() => {
     const fetchOnlineUsers = async () => {
-      if (accessToken) {
+      if (user) {
         try {
           const response = await fetch('http://localhost:3001/api/online-users', {
             headers: {
-              'Authorization': `Bearer ${accessToken}`
+              'Authorization': `Bearer ${user.accessToken}`
             }
           });
           if (response.ok) {
@@ -51,132 +106,7 @@ const App: React.FC = () => {
     const interval = setInterval(fetchOnlineUsers, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [accessToken]);
-
-  const handleRegister = async (username: string, password: string) => {
-    console.log('Attempting to register user:', username);
-    try {
-      const response = await fetch('http://localhost:3001/api/register', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({ username, password }),
-      });
-      console.log('Registration response status:', response.status);
-      const data: AuthResponse = await response.json();
-      console.log('Registration response data:', data);
-      if (data.success && data.accessToken && data.refreshToken) {
-        setUser(username);
-        setAccessToken(data.accessToken);
-        setRefreshToken(data.refreshToken);
-        console.log('Registration successful');
-      } else {
-        console.error('Registration failed:', data.error);
-        alert(`Registration failed: ${data.error}`);
-      }
-    } catch (error) {
-      console.error('Registration error:', error);
-      alert(`Registration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-
-  const handleLogin = async (username: string, password: string) => {
-    try {
-      const response = await fetch('http://localhost:3001/api/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({ username, password }),
-      });
-      const data: AuthResponse = await response.json();
-      if (data.success && data.accessToken && data.refreshToken) {
-        setUser(username);
-        setAccessToken(data.accessToken);
-        setRefreshToken(data.refreshToken);
-      } else {
-        console.error('Login failed:', data.error);
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await fetch('http://localhost:3001/api/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
-      setUser(null);
-      setAccessToken(null);
-      setRefreshToken(null);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  const refreshAccessToken = async () => {
-    try {
-      const response = await fetch('http://localhost:3001/api/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
-      const data: AuthResponse = await response.json();
-      if (data.success && data.accessToken) {
-        setAccessToken(data.accessToken);
-        return data.accessToken;
-      } else {
-        throw new Error('Failed to refresh token');
-      }
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      setUser(null);
-      setAccessToken(null);
-      setRefreshToken(null);
-      throw error;
-    }
-  };
-
-  const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
-    if (!accessToken) {
-      throw new Error('No access token available');
-    }
-
-    const authOptions = {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    };
-
-    let response = await fetch(url, authOptions);
-
-    if (response.status === 403) {
-      // Token might be expired, try to refresh it
-      const newToken = await refreshAccessToken();
-      authOptions.headers['Authorization'] = `Bearer ${newToken}`;
-      response = await fetch(url, authOptions);
-    }
-
-    if (!response.ok) {
-      throw new Error('Request failed');
-    }
-
-    return response;
-  };
+  }, [user]);
 
   // Update move history whenever the game state changes
   useEffect(() => {
@@ -541,7 +471,7 @@ const App: React.FC = () => {
       {user ? (
         <>
           <div className="welcome-container">
-            <h2 className="welcome-message">Welcome {user}!</h2>
+            <h2 className="welcome-message">Welcome {user.username}!</h2>
             <button className="logout-button" onClick={handleLogout}>Logout</button>
           </div>
           <div className="game-container">

@@ -10,6 +10,9 @@ import { GetMoveRequest, GetMoveResponse } from '../../shared/types';
 import { NewGameRequest, NewGameResponse } from '../../shared/types';
 import { MoveResponse, MoveRequest } from '../../shared/types';
 import { User, UserLoginRequest, UserRegistrationRequest, AuthResponse, RefreshTokenRequest } from '../../shared/types';
+import { initializeDatabase } from './database';
+import { createUser, getUser, updateElo } from './database/models/User';
+import { addGame, getGames } from './database/models/Game';
 
 // Initialize Express app and set port
 const app = express();
@@ -306,25 +309,16 @@ app.post<{}, AuthResponse, UserRegistrationRequest>('/api/register', async (req,
   console.log('Registration attempt for username:', username);
 
   // Check if user already exists
-  const existingUser = users.find(user => user.username === username);
+  const existingUser = await getUser(username);
   if (existingUser) {
     console.log('Registration failed: Username already exists');
     return res.status(400).json({ success: false, error: 'Username already exists' });
   }
 
   try {
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create new user
-    const newUser: User = { id: uuidv4(), username, password: hashedPassword };
-    users.push(newUser);
-
-    console.log('New user created:', { id: newUser.id, username: newUser.username });
-
-    // Generate access token
-    const accessToken = generateAccessToken({ id: newUser.id, username: newUser.username });
-    const refreshToken = jwt.sign({ userId: newUser.id }, REFRESH_TOKEN_SECRET);
+    const userId = await createUser(username, password);
+    const accessToken = jwt.sign({ userId, username }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ userId, username }, REFRESH_TOKEN_SECRET);
     refreshTokens.push(refreshToken);
 
     console.log('Registration successful, tokens generated');
@@ -337,29 +331,25 @@ app.post<{}, AuthResponse, UserRegistrationRequest>('/api/register', async (req,
 
 // User login route
 app.post<{}, AuthResponse, UserLoginRequest>('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-  
-  // Find user
-  const user = users.find(user => user.username === username);
-  if (!user) {
-    return res.status(400).json({ success: false, error: 'Invalid username or password' });
+  console.log('Login attempt for username:', req.body.username);
+  try {
+    const { username, password } = req.body;
+    const user = await getUser(username);
+    console.log('User found:', user ? 'Yes' : 'No');
+    if (user && await bcrypt.compare(password, user.password)) {
+      console.log('Password match for user:', username);
+      const accessToken = jwt.sign({ userId: user.id, username }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
+      const refreshToken = jwt.sign({ userId: user.id, username }, REFRESH_TOKEN_SECRET);
+      console.log('Tokens generated for user:', username);
+      res.json({ success: true, accessToken, refreshToken, username: user.username, elo: user.elo_rating });
+    } else {
+      console.log('Login failed for user:', username);
+      res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, error: 'Error logging in' });
   }
-
-  // Check password
-  const validPassword = await bcrypt.compare(password, user.password);
-  if (!validPassword) {
-    return res.status(400).json({ success: false, error: 'Invalid username or password' });
-  }
-
-  // Generate tokens
-  const accessToken = generateAccessToken({ id: user.id, username: user.username });
-  const refreshToken = jwt.sign({ userId: user.id }, REFRESH_TOKEN_SECRET);
-  refreshTokens.push(refreshToken);
-
-  // Add user to online users
-  onlineUsers.push(user);
-
-  res.json({ success: true, accessToken, refreshToken });
 });
 
 // Token refresh route
@@ -392,9 +382,6 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
-// In-memory user storage (replace with a database in a real application)
-const users: User[] = [];
-
 // Helper function to generate access token
 function generateAccessToken(user: Pick<User, 'id' | 'username'>) {
   return jwt.sign({ userId: user.id, username: user.username }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
@@ -404,10 +391,17 @@ function generateAccessToken(user: Pick<User, 'id' | 'username'>) {
 function authenticateToken(req: any, res: any, next: any) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (token == null) return res.sendStatus(401);
+  if (token == null) {
+    console.log('No token provided');
+    return res.sendStatus(401);
+  }
 
   jwt.verify(token, ACCESS_TOKEN_SECRET, (err: any, user: any) => {
-    if (err) return res.sendStatus(403);
+    if (err) {
+      console.log('Token verification failed:', err.message);
+      return res.sendStatus(403);
+    }
+    console.log('Token verified for user:', user.username);
     req.user = user;
     next();
   });
@@ -468,4 +462,32 @@ app.post<{}, NewGameResponse, NewGameRequest>('/api/new_game', async (req, res) 
 app.post('/api/end_game', (req, res) => {
   currentOpponent = null;
   res.json({ success: true, message: 'Game ended and opponent reset' });
+});
+
+app.get('/api/user', authenticateToken, async (req: any, res) => {
+  console.log('Authenticated user requesting data:', req.user);
+  try {
+    const user = await getUser(req.user.username);
+    if (user) {
+      console.log('User data found for:', user.username);
+      res.json({ 
+        success: true, 
+        username: user.username, 
+        elo: user.elo_rating 
+      });
+    } else {
+      console.log('No user data found for:', req.user.username);
+      res.status(404).json({ success: false, error: 'User not found' });
+    }
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({ success: false, error: 'Error fetching user data' });
+  }
+});
+
+initializeDatabase().then(() => {
+  console.log('Database initialized');
+}).catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
 });
