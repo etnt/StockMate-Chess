@@ -117,6 +117,9 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    if (ws && ws.readyState === WebSocket.OPEN && user) {
+      ws.send(JSON.stringify({ type: 'logout', username: user.username }));
+    }
     logout(ws);
     setUser(null);
     // Don't clear the online users list here, as it will be updated by the server

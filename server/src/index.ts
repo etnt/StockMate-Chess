@@ -512,12 +512,13 @@ wss.on('connection', (ws: WebSocket) => {
       username = data.username;
       onlineUsers[userId] = { id: userId, username: data.username };
       broadcastOnlineUsers();
-    } else if (data.type === 'logout') {
-      if (username) {
-        delete onlineUsers[userId];
-        username = null;
+    } else if (data.type === 'logout' && typeof data.username === 'string') {
+      const userIdToRemove = Object.keys(onlineUsers).find(key => onlineUsers[key].username === data.username);
+      if (userIdToRemove) {
+        delete onlineUsers[userIdToRemove];
         broadcastOnlineUsers();
       }
+      username = null;
     }
   });
 
