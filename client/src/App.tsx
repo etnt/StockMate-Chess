@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import EvaluationBar from './components/EvaluationBar';
@@ -533,9 +533,9 @@ const App: React.FC = () => {
             </div>
             <div className="online-players">
               <h3>Online Players</h3>
-              {onlineUsers.length > 0 ? (
+              {memoizedOnlineUsers.length > 0 ? (
                 <ul>
-                  {onlineUsers.map((onlineUser) => (
+                  {memoizedOnlineUsers.map((onlineUser) => (
                     <li key={onlineUser.id}>{onlineUser.username}</li>
                   ))}
                 </ul>
