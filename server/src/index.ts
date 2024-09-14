@@ -527,6 +527,9 @@ wss.on('connection', (ws: WebSocket) => {
       broadcastOnlineUsers();
     }
   });
+
+  // Send the initial list of online users to the newly connected client
+  ws.send(JSON.stringify({ type: 'onlineUsers', users: Object.values(onlineUsers) }));
 });
 
 function broadcastOnlineUsers() {

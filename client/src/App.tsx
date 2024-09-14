@@ -59,6 +59,13 @@ const App: React.FC = () => {
       }
     };
 
+    // Send a login message when the WebSocket connection is established
+    socket.onopen = () => {
+      if (user) {
+        socket.send(JSON.stringify({ type: 'login', username: user.username }));
+      }
+    };
+
     return () => {
       socket.close();
     };
@@ -112,7 +119,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     logout(ws);
     setUser(null);
-    setOnlineUsers([]); // Clear the online users list
+    // Don't clear the online users list here, as it will be updated by the server
   };
 
   // Update move history whenever the game state changes
