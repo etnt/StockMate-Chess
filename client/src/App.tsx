@@ -35,6 +35,19 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const memoizedOnlineUsers = useMemo(() => {
+    return onlineUsers.filter((onlineUser: OnlineUser) => 
+      onlineUser.username !== user?.username
+    ).reduce((acc: OnlineUser[], current: OnlineUser) => {
+      const x = acc.find(item => item.username === current.username);
+      if (!x) {
+        return acc.concat([current]);
+      } else {
+        return acc;
+      }
+    }, []);
+  }, [onlineUsers, user]);
+
   useEffect(() => {
     const socket = new WebSocket('ws://localhost:3001');
     setWs(socket);
@@ -42,26 +55,14 @@ const App: React.FC = () => {
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'onlineUsers') {
-        // Filter out the current user and remove duplicates
-        const filteredUsers = data.users.filter((onlineUser: OnlineUser) => 
-          onlineUser.username !== user?.username
-        );
-        const uniqueUsers = filteredUsers.reduce((acc: OnlineUser[], current: OnlineUser) => {
-          const x = acc.find(item => item.username === current.username);
-          if (!x) {
-            return acc.concat([current]);
-          } else {
-            return acc;
-          }
-        }, []);
-        setOnlineUsers(uniqueUsers);
+        setOnlineUsers(data.users);
       }
     };
 
     return () => {
       socket.close();
     };
-  }, [user]); // Add user as a dependency
+  }, []);
 
   const fetchUserData = async () => {
     try {
