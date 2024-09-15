@@ -103,4 +103,14 @@ export const updateElo = async (newElo: number) => {
   return response.data;
 };
 
+export const getMoveFromServer = async (request: GetMoveRequest): Promise<GetMoveResponse> => {
+  try {
+    const response = await api.post('/api/get_move', request);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting move from server:', error);
+    throw error;
+  }
+};
+
 export default api;

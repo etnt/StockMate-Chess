@@ -6,7 +6,7 @@ import axios from 'axios';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { GetMoveRequest, GetMoveResponse } from '../../shared/types';
+import { GetMoveRequest, GetMoveResponse, SuccessfulGetMoveResponse, ErrorResponse } from '../../shared/types';
 import { NewGameRequest, NewGameResponse } from '../../shared/types';
 import { MoveResponse, MoveRequest } from '../../shared/types';
 import { User, UserLoginRequest, UserRegistrationRequest, AuthResponse, RefreshTokenRequest } from '../../shared/types';
@@ -15,6 +15,7 @@ import { createUser, getUser, updateElo } from './database/models/User';
 import { addGame, getGames } from './database/models/Game';
 import http from 'http';
 import WebSocket from 'ws';
+import { Move } from 'chess.js';  // Make sure to import the Move type from chess.js
 
 // Initialize Express app and set port
 const app = express();
@@ -97,7 +98,7 @@ app.post('/api/set-depth', async (req, res) => {
  * @param board - FEN string representing the current board state
  * @returns JSON string of the best move
  */
-async function getStockfishMove(board: string): Promise<{ move: any, evaluation: number }> {
+async function getStockfishMove(board: string): Promise<SuccessfulGetMoveResponse> {
   try {
     await engine.position(board);
     const result = await engine.go({ depth: searchDepth });
@@ -202,7 +203,7 @@ async function getStockfishEvaluation(board: string): Promise<number> {
   }
 }
 
-async function getNextMove(board: string, opponent: string): Promise<{ move: any, evaluation: number }> {
+async function getNextMove(board: string, opponent: string): Promise<SuccessfulGetMoveResponse> {
   switch (opponent) {
     case 'stockfish':
       return getStockfishMove(board);
@@ -215,28 +216,30 @@ async function getNextMove(board: string, opponent: string): Promise<{ move: any
   }
 }
 
-// Use the interfaces in your route handler
-app.post<{}, GetMoveResponse, GetMoveRequest>('/api/get_move', async (req, res) => {
-  const { board } = req.body;
-  console.log('Received board:', board);
-  console.log('Selected opponent:', currentOpponent);
+app.post('/api/get_move', async (req, res) => {
+  const { board, opponent } = req.body;
+  console.log(`Received move request. Board: ${board}, Opponent: ${opponent}`);
+
+  if (!opponent) {
+    const errorResponse: ErrorResponse = { error: 'No opponent specified' };
+    return res.status(400).json(errorResponse);
+  }
 
   try {
-    if (!currentOpponent) {
-      throw new Error('No opponent selected. Please start a new game first.');
+    let response: SuccessfulGetMoveResponse;
+
+    if (opponent === 'stockfish') {
+      response = await getStockfishMove(board);
+    } else {
+      const errorResponse: ErrorResponse = { error: 'Invalid opponent' };
+      return res.status(400).json(errorResponse);
     }
 
-    const { move, evaluation } = await getNextMove(board, currentOpponent);
-    res.json({ move, evaluation });
+    res.json(response);
   } catch (error) {
-    console.error('Error in /api/get_move:', error);
-    if (error instanceof Error && error.message.startsWith('Game over')) {
-      res.json({ error: error.message.split(': ')[1] });
-    } else {
-      res.status(500).json({
-        error: error instanceof Error ? error.message : "An unknown error occurred"
-      });
-    }
+    console.error('Error getting move:', error);
+    const errorResponse: ErrorResponse = { error: 'Error getting move' };
+    res.status(500).json(errorResponse);
   }
 });
 
@@ -309,7 +312,7 @@ app.get('/', (req, res) => {
 app.post<{}, AuthResponse, UserRegistrationRequest>('/api/register', async (req, res) => {
   console.log('Received registration request');
   const { username, password } = req.body;
-  
+
   console.log('Registration attempt for username:', username);
 
   // Check if user already exists
@@ -376,7 +379,7 @@ app.post<{}, AuthResponse, RefreshTokenRequest>('/api/token', (req, res) => {
 app.post('/api/logout', authenticateToken, (req: any, res) => {
   const username = req.user.username;
   console.log(`Logout request for user: ${username}`);
-  
+
   const userIdToRemove = Object.keys(onlineUsers).find(key => onlineUsers[key].username === username);
   if (userIdToRemove) {
     console.log(`Removing user from online users: ${username}`);
@@ -385,7 +388,7 @@ app.post('/api/logout', authenticateToken, (req: any, res) => {
   } else {
     console.log(`User not found in online users: ${username}`);
   }
-  
+
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -488,10 +491,10 @@ app.get('/api/user', authenticateToken, async (req: any, res) => {
     const user = await getUser(req.user.username);
     if (user) {
       console.log('User data found for:', user.username);
-      res.json({ 
-        success: true, 
-        username: user.username, 
-        elo: user.elo_rating 
+      res.json({
+        success: true,
+        username: user.username,
+        elo: user.elo_rating
       });
     } else {
       console.log('No user data found for:', req.user.username);
@@ -506,7 +509,7 @@ app.get('/api/user', authenticateToken, async (req: any, res) => {
 wss.on('connection', (ws: WebSocket) => {
   const userId = uuidv4();
   let username: string | null = null;
-  
+
   console.log(`New WebSocket connection established. UserId: ${userId}`);
 
   ws.on('message', (message: string) => {

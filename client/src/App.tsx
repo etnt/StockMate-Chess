@@ -1,415 +1,32 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Chess, Square } from 'chess.js';
+import React from 'react';
 import { Chessboard } from 'react-chessboard';
 import EvaluationBar from './components/EvaluationBar';
 import OpponentSelector from './components/OpponentSelector';
-import { GetMoveRequest, GetMoveResponse, SuccessfulGetMoveResponse } from '../../shared/types';
-import { MoveRequest, MoveResponse } from '../../shared/types';
-import { User, OnlineUser } from '../../shared/types';  // Adjust the import path as necessary
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
+import { useChessGame } from './hooks/useChessGame';
+import { useOpponent } from './hooks/useOpponent';
+import { useAuth } from './hooks/useAuth';
+import { useWebSocket } from './hooks/useWebSocket';
 import './App.css';
-import { login, register, logout, getUserData } from './services/api';
-
-
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [game, setGame] = useState(new Chess());
-  const [fen, setFen] = useState(game.fen());
-  const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
-  const [moveHistory, setMoveHistory] = useState('');
-  const [fullHistory, setFullHistory] = useState<string[]>([]);
-  const [searchDepth, setSearchDepth] = useState<number>(10);
-  const [evaluation, setEvaluation] = useState(0);
-  const [suggestedMove, setSuggestedMove] = useState(null);
-  const [opponent, setOpponent] = useState<string>('stockfish');
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
-  const [ws, setWs] = useState<WebSocket | null>(null);
+  const { user, handleLogin, handleRegister, handleLogout } = useAuth();
+  const { game, fen, selectedPiece, moveHistory, evaluation, suggestedMove, makeAMove, onSquareClick, onPieceDrop, startNewGame, undoLastMove, setSuggestedMove } = useChessGame();
+  const { opponent, setOpponent, searchDepth, setSearchDepth, setStockfishDepth } = useOpponent();
+  const { ws, onlineUsers } = useWebSocket(user);
+
   const boardSize = 600;
-
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      fetchUserData();
-    }
-  }, []);
-
-  const memoizedOnlineUsers = useMemo(() => {
-    return onlineUsers.filter((onlineUser: OnlineUser) => 
-      onlineUser.username !== user?.username
-    ).reduce((acc: OnlineUser[], current: OnlineUser) => {
-      const x = acc.find(item => item.username === current.username);
-      if (!x) {
-        return acc.concat([current]);
-      } else {
-        return acc;
-      }
-    }, []);
-  }, [onlineUsers, user]);
-
-  useEffect(() => {
-    console.log('Initializing WebSocket connection');
-    const socket = new WebSocket('ws://localhost:3001');
-    setWs(socket);
-
-    socket.onopen = () => {
-      console.log('WebSocket connection established');
-    };
-
-    socket.onmessage = (event) => {
-      console.log(`Received WebSocket message: ${event.data}`);
-      const data = JSON.parse(event.data);
-      if (data.type === 'onlineUsers') {
-        console.log('Received online users:', data.users);
-        const filteredUsers = data.users.filter((onlineUser: OnlineUser) => 
-          onlineUser.username !== user?.username
-        );
-        console.log('Filtered online users:', filteredUsers);
-        setOnlineUsers(filteredUsers);
-      }
-    };
-
-    socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    socket.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
-
-    return () => {
-      console.log('Closing WebSocket connection');
-      socket.close();
-    };
-  }, [user]);
-
-  const fetchUserData = async () => {
-    try {
-      const userData = await getUserData();
-      console.log('Fetched user data:', userData);  // Add this line
-      setUser(userData);
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      handleLogout();
-    }
-  };
-
-  const handleLogin = async (username: string, password: string) => {
-    console.log(`Attempting login for user: ${username}`);
-    try {
-      const data = await login(username, password);
-      console.log('Login data:', data);  // Add this line
-      if (data.success) {
-        console.log('Login successful');
-        setUser(data);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          console.log('Sending login message to WebSocket');
-          ws.send(JSON.stringify({ type: 'login', username: data.username }));
-        } else {
-          console.log('WebSocket not ready, unable to send login message');
-        }
-      } else {
-        console.log('Login failed:', data.error);
-        throw new Error(data.error || 'Login failed');
-      }
-    } catch (error) {
-      console.error('Login error:', error.message);
-      throw error;
-    }
-  };
-
-  const handleRegister = async (username: string, password: string) => {
-    try {
-      const data = await register(username, password);
-      if (data.success) {
-        fetchUserData();
-      } else {
-        throw new Error(data.error || 'Registration failed');
-      }
-    } catch (error) {
-      console.error('Registration failed:', error.message);
-      throw error; // Re-throw the error so it can be caught by the RegisterForm
-    }
-  };
-
-  const handleLogout = async () => {
-    console.log('Logging out');
-    logout(ws);
-    setUser(null);
-    setOnlineUsers([]);
-  };
-
-  // Update move history whenever the game state changes
-  useEffect(() => {
-    setFen(game.fen());
-    updateMoveHistory();
-    if (game.turn() === 'b') {
-      requestMove();
-    }
-  }, [game, fullHistory]);
-
-  /**
-   * Makes a move on the chess board.
-   * 
-   * This function creates a copy of the current game state, attempts to make the specified move,
-   * and updates the game state if the move is legal.
-   * 
-   * @param {Object} move - The move to be made, typically containing 'from' and 'to' properties.
-   * @returns {Object|null} The move object if the move was legal, null if it was illegal.
-   */
-  const makeAMove = async (from: Square, to: Square) => {
-    const gameCopy = new Chess(game.fen());
-    try {
-      const result = gameCopy.move({ from, to, promotion: 'q' });
-      if (result) {
-        console.log('Move made:', result.san);
-        setGame(gameCopy);
-        setFen(gameCopy.fen());
-        setFullHistory(prevHistory => [...prevHistory, result.san]);
-        setSuggestedMove(null);
-        setSelectedPiece(null);  // Reset selectedPiece after a successful move
-
-        // Inform server about the move
-        if (opponent === 'chess_tune') {
-          const moveRequest: MoveRequest = { from, to, promotion: 'q', san: result.san };
-          const serverResponse = await sendMoveToServer(moveRequest);
-          if (!serverResponse.success) {
-            console.warn('Server reported an issue:', serverResponse.error);
-          }
-        }
-
-        return result.san; // Return the move in SAN format
-      }
-    } catch (error) {
-      console.error('Invalid move:', error);
-    }
-    return null; // Return null for invalid moves
-  };
-
-  const sendMoveToServer = async (request: MoveRequest): Promise<MoveResponse> => {
-    try {
-      const response = await fetch('http://localhost:3001/api/move', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
-
-      const data: MoveResponse = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.success === false ? data.error : 'Failed to inform server about the move');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error informing server about move:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
-    }
-  };
-
-  /**
-   * Handles the clicking of a square on the chess board.
-   * 
-   * This function is called when a player clicks on a square. It attempts to select the piece
-   * on that square if no piece is currently selected, or it attempts to move the currently
-   * selected piece to that square if a piece is selected.
-   * 
-   * @param {string} square - The square that was clicked.
-   */
-  function onSquareClick(square: Square) {
-    if (selectedPiece === null) {
-      // If no piece is selected, select the clicked piece if it exists
-      const piece = game.get(square);
-      if (piece && piece.color === game.turn()) {
-        setSelectedPiece(square);
-      }
-    } else {
-      // If a piece is already selected, try to move it to the clicked square
-      const result = makeAMove(selectedPiece as Square, square);
-      if (result) {
-        setSelectedPiece(null);
-      } else {
-        // If the move was invalid, select the new square if it has a piece of the current player's color
-        const piece = game.get(square);
-        if (piece && piece.color === game.turn()) {
-          setSelectedPiece(square);
-        } else {
-          setSelectedPiece(null);
-        }
-      }
-    }
-  }
-
-  /**
-   * Handles the dropping of a piece on the chess board.
-   * 
-   * This function is called when a player drops a piece after dragging it. It attempts to make
-   * the move and returns true if the move was legal, false otherwise.
-   * 
-   * @param {string} sourceSquare - The square from which the piece is moved (e.g., "e2").
-   * @param {string} targetSquare - The square to which the piece is moved (e.g., "e4").
-   * @returns {boolean} True if the move was legal and made, false otherwise.
-   */
-  function onPieceDrop(sourceSquare: string, targetSquare: string) {
-    if (selectedPiece !== null) {
-      // If a piece is already selected, it means onSquareClick will handle the move
-      return false;
-    }
-
-    if (isValidSquare(sourceSquare) && isValidSquare(targetSquare)) {
-      const result = makeAMove(sourceSquare as Square, targetSquare as Square);
-      return result !== null;
-    }
-    return false;
-  }
-
-  function isValidSquare(square: string): square is Square {
-    // Add logic to validate if the string is a valid chess square
-    return /^[a-h][1-8]$/.test(square);
-  }
-
-  async function getMoveFromServer(request: GetMoveRequest): Promise<GetMoveResponse> {
-    const response = await fetch('http://localhost:3001/api/get_move', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-    return response.json();
-  }
-
-
-  async function requestMove() {
-    try {
-      console.log('Requesting move from server:', game.fen());
-      const response: GetMoveResponse = await getMoveFromServer({ board: game.fen(), opponent });
-
-      if ('error' in response) {
-        console.error('Server error:', response.error);
-        return;
-      }
-
-      // At this point, TypeScript knows response is SuccessfulGetMoveResponse
-      const { move, evaluation } = response;
-      console.log('Received move:', move);
-
-      const { from, to, promotion } = move;
-
-      // Create a new Chess instance
-      const newGame = new Chess(game.fen());
-
-      // Add a delay before making the move (e.g., 500ms)
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Make the move on the new chess instance
-      const result = newGame.move({ from, to, promotion });
-
-      if (result === null) {
-        console.error(`Invalid move: ${JSON.stringify(move)}`);
-        return;
-      }
-
-      // Update the game state
-      setGame(newGame);
-      setFen(newGame.fen());
-      setFullHistory(prevHistory => [...prevHistory, result.san]);
-
-      // Update evaluation
-      setEvaluation(evaluation);
-
-      console.log('Move applied, new FEN:', newGame.fen());
-
-    } catch (error) {
-      console.error('Error requesting move from server:', error);
-    }
-  }
-
-  async function setStockfishDepth(depth: number) {
-    try {
-      const response = await fetch('http://localhost:3001/api/set-depth', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ depth }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        console.log(`Search depth set to ${depth}`);
-      } else {
-        console.error('Failed to set search depth:', data.error);
-      }
-    } catch (error) {
-      console.error('Error setting search depth:', error);
-    }
-  }
-
-  function updateMoveHistory() {
-    let formattedHistory = '';
-    for (let i = 0; i < fullHistory.length; i += 2) {
-      const moveNumber = Math.floor(i / 2) + 1;
-      const whiteMove = fullHistory[i];
-      const blackMove = fullHistory[i + 1] || '';
-      formattedHistory += `${moveNumber}. ${whiteMove} ${blackMove}\n`;
-    }
-    setMoveHistory(formattedHistory.trim());
-  };
-
-  const requestNewGame = async (opponent: string): Promise<NewGameResponse> => {
-    const request: NewGameRequest = { opponent };
-    const response = await fetch('http://localhost:3001/api/new_game', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-
-    return await response.json();
-  };
-
-  const startNewGame = async () => {
-    const newGame = new Chess();
-    setGame(newGame);
-    setFen(newGame.fen());
-    setEvaluation(0); // Reset evaluation to 0
-    setMoveHistory(''); // Clear the formatted move history
-    setFullHistory([]); // Clear the full history array
-    setSuggestedMove(null);
-    setSelectedPiece(null); // Reset the selected piece
-
-    try {
-      const data = await requestNewGame(opponent);
-      if (data.success) {
-        console.log('Server informed about new game:', data.message);
-      } else {
-        console.warn('Server reported an error:', data.error);
-      }
-    } catch (error) {
-      console.error('Error informing server about new game:', error);
-    }
-  };
-
-  const highlightSuggestedMove = (move) => {
-    setSuggestedMove(move);
-  };
 
   const requestSuggestion = async () => {
     if (game.turn() === 'w') {
       try {
-        setSelectedPiece(null); // Reset the selected piece
         const response = await fetch('http://localhost:3001/api/suggest', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ board: game.fen() }),
+          body: JSON.stringify({ board: fen }),
         });
         const data = await response.json();
 
@@ -423,8 +40,7 @@ const App: React.FC = () => {
           return;
         }
 
-        // Highlight the suggested move on the board
-        highlightSuggestedMove(data.move);
+        setSuggestedMove(data.move);
 
       } catch (error) {
         console.error('Error requesting move suggestion:', error);
@@ -433,69 +49,6 @@ const App: React.FC = () => {
       console.log("It's not White's turn to move");
     }
   };
-
-  async function requestEvaluation(fen: string): Promise<number | null> {
-    try {
-      const response = await fetch('http://localhost:3001/api/evaluate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ board: fen }),
-      });
-
-      const data = await response.json();
-      if (data.evaluation !== undefined) {
-        return data.evaluation;
-      } else if (data.error) {
-        console.error('Evaluation error:', data.error);
-      }
-    } catch (error) {
-      console.error('Error requesting evaluation:', error);
-    }
-    return null;
-  }
-
-  async function undoLastMove() {
-    console.log('Undoing last move 1:', fullHistory);
-    if (fullHistory.length > 0) {
-      let newHistory;
-      if (fullHistory.length % 2 === 0) {
-        // If even number of moves, remove the last two
-        newHistory = fullHistory.slice(0, -2);
-      } else {
-        // If odd number of moves, remove only the last one
-        newHistory = fullHistory.slice(0, -1);
-      }
-
-      console.log('Undoing last move 2:', newHistory);
-
-      const newGame = new Chess();
-      newHistory.forEach(move => newGame.move(move));
-
-      console.log('Undoing last move 3:', newGame.history());
-
-      setGame(newGame);
-      setFen(newGame.fen());
-      setFullHistory(newHistory);
-      setSuggestedMove(null);
-      setSelectedPiece(null);
-      updateMoveHistory();
-
-      if (newHistory.length > 0) {
-        // Request new evaluation
-        const newEvaluation = await requestEvaluation(newGame.fen());
-        if (newEvaluation !== null) {
-          setEvaluation(-newEvaluation);
-        }
-      }
-      else {
-        setEvaluation(0);
-      }
-    } else {
-      console.log('No moves to undo');
-    }
-  }
 
   return (
     <div className="App">
@@ -530,7 +83,10 @@ const App: React.FC = () => {
                   </select>
                 </div>
               )}
-              <button className="new-game-button" onClick={startNewGame}>New Game</button>
+              <button className="new-game-button" onClick={() => {
+                console.log("Starting new game with opponent:", opponent);
+                startNewGame(opponent);
+              }}>New Game</button>
               <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
               <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
             </div>
@@ -559,9 +115,9 @@ const App: React.FC = () => {
             </div>
             <div className="online-players">
               <h3>Online Players</h3>
-              {memoizedOnlineUsers.length > 0 ? (
+              {onlineUsers.length > 0 ? (
                 <ul>
-                  {memoizedOnlineUsers.map((onlineUser) => (
+                  {onlineUsers.map((onlineUser) => (
                     <li key={onlineUser.id}>{onlineUser.username}</li>
                   ))}
                 </ul>
