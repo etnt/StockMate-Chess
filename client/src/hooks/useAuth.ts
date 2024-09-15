@@ -2,9 +2,26 @@ import { useState, useEffect } from 'react';
 import { User } from '../../../shared/types';
 import { login, register, logout, getUserData } from '../services/api';
 
+/**
+ * Custom React hook for managing user authentication.
+ * 
+ * This hook encapsulates the logic for:
+ * - User login
+ * - User registration
+ * - User logout
+ * - Fetching and maintaining user data
+ * 
+ * @returns An object containing the user state and authentication functions.
+ */
 export function useAuth() {
+  // The current authenticated user, or null if not authenticated
   const [user, setUser] = useState<User | null>(null);
 
+  /**
+   * Effect hook to check for an existing authentication token and fetch user data if present.
+   * 
+   * This effect runs once when the component mounts.
+   */
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (token) {
@@ -12,6 +29,12 @@ export function useAuth() {
     }
   }, []);
 
+  /**
+   * Fetches the current user's data from the server.
+   * 
+   * This function is called when the component mounts if an access token is present,
+   * and after successful login or registration.
+   */
   const fetchUserData = async () => {
     try {
       const userData = await getUserData();
@@ -23,6 +46,13 @@ export function useAuth() {
     }
   };
 
+  /**
+   * Attempts to log in a user with the provided credentials.
+   * 
+   * @param username - The user's username
+   * @param password - The user's password
+   * @throws Will throw an error if login fails
+   */
   const handleLogin = async (username: string, password: string) => {
     console.log(`Attempting login for user: ${username}`);
     try {
@@ -41,6 +71,13 @@ export function useAuth() {
     }
   };
 
+  /**
+   * Attempts to register a new user with the provided credentials.
+   * 
+   * @param username - The desired username for the new user
+   * @param password - The desired password for the new user
+   * @throws Will throw an error if registration fails
+   */
   const handleRegister = async (username: string, password: string) => {
     try {
       const data = await register(username, password);
@@ -55,6 +92,11 @@ export function useAuth() {
     }
   };
 
+  /**
+   * Logs out the current user.
+   * 
+   * This function clears the user's authentication token and resets the user state.
+   */
   const handleLogout = () => {
     console.log('Logging out');
     logout();
@@ -62,9 +104,9 @@ export function useAuth() {
   };
 
   return {
-    user,
-    handleLogin,
-    handleRegister,
-    handleLogout
+    user,            // The current authenticated user, or null if not authenticated
+    handleLogin,     // Function to log in a user
+    handleRegister,  // Function to register a new user
+    handleLogout     // Function to log out the current user
   };
 }
