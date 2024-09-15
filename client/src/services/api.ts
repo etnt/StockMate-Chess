@@ -53,12 +53,33 @@ export const register = async (username: string, password: string) => {
   }
 };
 
-export const logout = (ws: WebSocket | null) => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'logout' }));
+export const logout = async (ws: WebSocket | null) => {
+  try {
+    // Send logout request to the server
+    const response = await fetch('http://localhost:3001/api/logout', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Logout failed');
+    }
+
+    // If logout was successful, send WebSocket message
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'logout' }));
+    }
+
+    // Clear local storage
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+
+    console.log('Logout successful');
+  } catch (error) {
+    console.error('Logout error:', error);
   }
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
 };
 
 export const getUserData = async () => {

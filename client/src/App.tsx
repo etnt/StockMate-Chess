@@ -49,27 +49,40 @@ const App: React.FC = () => {
   }, [onlineUsers, user]);
 
   useEffect(() => {
+    console.log('Initializing WebSocket connection');
     const socket = new WebSocket('ws://localhost:3001');
     setWs(socket);
 
+    socket.onopen = () => {
+      console.log('WebSocket connection established');
+    };
+
     socket.onmessage = (event) => {
+      console.log(`Received WebSocket message: ${event.data}`);
       const data = JSON.parse(event.data);
       if (data.type === 'onlineUsers') {
-        setOnlineUsers(data.users);
+        console.log('Received online users:', data.users);
+        const filteredUsers = data.users.filter((onlineUser: OnlineUser) => 
+          onlineUser.username !== user?.username
+        );
+        console.log('Filtered online users:', filteredUsers);
+        setOnlineUsers(filteredUsers);
       }
     };
 
-    // Send a login message when the WebSocket connection is established
-    socket.onopen = () => {
-      if (user) {
-        socket.send(JSON.stringify({ type: 'login', username: user.username }));
-      }
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    socket.onclose = () => {
+      console.log('WebSocket connection closed');
     };
 
     return () => {
+      console.log('Closing WebSocket connection');
       socket.close();
     };
-  }, []);
+  }, [user]);
 
   const fetchUserData = async () => {
     try {
@@ -83,21 +96,25 @@ const App: React.FC = () => {
   };
 
   const handleLogin = async (username: string, password: string) => {
+    console.log(`Attempting login for user: ${username}`);
     try {
       const data = await login(username, password);
       console.log('Login data:', data);  // Add this line
       if (data.success) {
-        console.log('Login successful, fetching user data');  // Add this line
-        await fetchUserData();
-        console.log('User data fetched');  // Add this line
+        console.log('Login successful');
+        setUser(data);
         if (ws && ws.readyState === WebSocket.OPEN) {
+          console.log('Sending login message to WebSocket');
           ws.send(JSON.stringify({ type: 'login', username: data.username }));
+        } else {
+          console.log('WebSocket not ready, unable to send login message');
         }
       } else {
+        console.log('Login failed:', data.error);
         throw new Error(data.error || 'Login failed');
       }
     } catch (error) {
-      console.error('Login failed:', error.message);
+      console.error('Login error:', error.message);
       throw error;
     }
   };
@@ -116,13 +133,11 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    if (ws && ws.readyState === WebSocket.OPEN && user) {
-      ws.send(JSON.stringify({ type: 'logout', username: user.username }));
-    }
+  const handleLogout = async () => {
+    console.log('Logging out');
     logout(ws);
     setUser(null);
-    // Don't clear the online users list here, as it will be updated by the server
+    setOnlineUsers([]);
   };
 
   // Update move history whenever the game state changes

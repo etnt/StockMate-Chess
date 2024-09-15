@@ -375,12 +375,17 @@ app.post<{}, AuthResponse, RefreshTokenRequest>('/api/token', (req, res) => {
 // Logout route
 app.post('/api/logout', authenticateToken, (req: any, res) => {
   const username = req.user.username;
-  // Remove user from online users
+  console.log(`Logout request for user: ${username}`);
+  
   const userIdToRemove = Object.keys(onlineUsers).find(key => onlineUsers[key].username === username);
   if (userIdToRemove) {
+    console.log(`Removing user from online users: ${username}`);
     delete onlineUsers[userIdToRemove];
     broadcastOnlineUsers();
+  } else {
+    console.log(`User not found in online users: ${username}`);
   }
+  
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
@@ -502,28 +507,36 @@ wss.on('connection', (ws: WebSocket) => {
   const userId = uuidv4();
   let username: string | null = null;
   
+  console.log(`New WebSocket connection established. UserId: ${userId}`);
+
   ws.on('message', (message: string) => {
+    console.log(`Received message: ${message}`);
     const data = JSON.parse(message);
     if (data.type === 'login' && typeof data.username === 'string') {
-      // Remove the user if they were already logged in
+      console.log(`User logging in: ${data.username}`);
       if (username) {
+        console.log(`Removing existing user: ${username}`);
         delete onlineUsers[userId];
       }
       username = data.username;
       onlineUsers[userId] = { id: userId, username: data.username };
+      console.log(`Added user to online users: ${JSON.stringify(onlineUsers[userId])}`);
       broadcastOnlineUsers();
-    } else if (data.type === 'logout' && typeof data.username === 'string') {
-      const userIdToRemove = Object.keys(onlineUsers).find(key => onlineUsers[key].username === data.username);
-      if (userIdToRemove) {
-        delete onlineUsers[userIdToRemove];
+    } else if (data.type === 'logout') {
+      console.log(`WebSocket logout message received for user: ${username}`);
+      if (username) {
+        console.log(`Removing user from online users: ${username}`);
+        delete onlineUsers[userId];
+        username = null;
         broadcastOnlineUsers();
       }
-      username = null;
     }
   });
 
   ws.on('close', () => {
+    console.log(`WebSocket connection closed. UserId: ${userId}`);
     if (username) {
+      console.log(`Removing user from online users: ${username}`);
       delete onlineUsers[userId];
       broadcastOnlineUsers();
     }
@@ -535,6 +548,7 @@ wss.on('connection', (ws: WebSocket) => {
 
 function broadcastOnlineUsers() {
   const users = Object.values(onlineUsers);
+  console.log(`Broadcasting online users: ${JSON.stringify(users)}`);
   const message = JSON.stringify({ type: 'onlineUsers', users });
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
