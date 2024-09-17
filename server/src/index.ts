@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { GetMoveRequest, GetMoveResponse, SuccessfulGetMoveResponse, ErrorResponse } from '../../shared/types';
 import { NewGameRequest, NewGameResponse } from '../../shared/types';
-import { MoveResponse, MoveRequest } from '../../shared/types';
+import { MoveResponse, MoveRequest, WebSocketMessage } from '../../shared/types';
 import { User, UserLoginRequest, UserRegistrationRequest, AuthResponse, RefreshTokenRequest } from '../../shared/types';
 import { initializeDatabase } from './database';
 import { createUser, getUser, updateElo } from './database/models/User';
@@ -40,6 +40,7 @@ const REFRESH_TOKEN_SECRET = 'your_refresh_token_secret';
 // In-memory storage for refresh tokens and online users (replace with a database in production)
 let refreshTokens: string[] = [];
 const onlineUsers: { [key: string]: { id: string, username: string } } = {};
+const wsClients: { [username: string]: WebSocket } = {};
 
 // Add a middleware to log all incoming requests
 app.use((req, res, next) => {
@@ -348,7 +349,8 @@ app.post<{}, AuthResponse, UserLoginRequest>('/api/login', async (req, res) => {
       console.log('Tokens generated for user:', username);
       res.json({ success: true, accessToken, refreshToken, username: user.username, elo: user.elo_rating });
       // Broadcast updated online users list
-      onlineUsers[req.body.username] = { id: user.id, username: user.username };
+      onlineUsers[user.id] = { id: user.id, username: user.username };
+      wsClients[user.username] = (req as any).ws; // Assume WebSocket is attached to request
       broadcastOnlineUsers();
     } else {
       console.log('Login failed for user:', username);
@@ -382,6 +384,7 @@ app.post('/api/logout', authenticateToken, (req: any, res) => {
   if (userIdToRemove) {
     console.log(`Removing user from online users: ${username}`);
     delete onlineUsers[userIdToRemove];
+    delete wsClients[username];
     broadcastOnlineUsers();
   } else {
     console.log(`User not found in online users: ${username}`);
@@ -512,24 +515,56 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('message', (message: string) => {
     console.log(`Received message: ${message}`);
-    const data = JSON.parse(message);
+    const data: WebSocketMessage = JSON.parse(message);
     if (data.type === 'login' && typeof data.username === 'string') {
       console.log(`User logging in: ${data.username}`);
       if (username) {
         console.log(`Removing existing user: ${username}`);
-        delete onlineUsers[userId];
+        delete onlineUsers[username];
+        delete wsClients[username];
       }
       username = data.username;
-      onlineUsers[userId] = { id: userId, username: data.username };
-      console.log(`Added user to online users: ${JSON.stringify(onlineUsers[userId])}`);
+      onlineUsers[username] = { id: userId, username: data.username };
+      wsClients[username] = ws;
+      console.log(`Added user to online users: ${JSON.stringify(onlineUsers[username])}`);
       broadcastOnlineUsers();
-    } else if (data.type === 'logout') {
-      console.log(`WebSocket logout message received for user: ${username}`);
-      if (username) {
-        console.log(`Removing user from online users: ${username}`);
-        delete onlineUsers[userId];
-        username = null;
-        broadcastOnlineUsers();
+    } else if (data.type === 'challenge' && data.from && data.to) {
+      console.log(`Challenge from ${data.from} to ${data.to}`);
+      const targetWs = wsClients[data.to];
+      if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+        const challengeReceived: WebSocketMessage = {
+          type: 'challenge_received',
+          from: data.from
+        };
+        targetWs.send(JSON.stringify(challengeReceived));
+        console.log(`Sent challenge_received to ${data.to}`);
+      } else {
+        console.log(`User ${data.to} is not online`);
+      }
+    } else if (data.type === 'challenge_response' && data.from && data.to !== undefined) {
+      console.log(`Challenge response from ${data.from} to ${data.to}: ${data.accepted}`);
+      const challengerWs = wsClients[data.to];
+      if (challengerWs && challengerWs.readyState === WebSocket.OPEN) {
+        const challengeResponse: WebSocketMessage = {
+          type: 'challenge_response',
+          from: data.from,
+          to: data.to,
+          accepted: data.accepted
+        };
+        challengerWs.send(JSON.stringify(challengeResponse));
+        console.log(`Sent challenge_response to ${data.to}`);
+
+        if (data.accepted) {
+          const startGame: WebSocketMessage = {
+            type: 'start_game',
+            opponent: data.from
+          };
+          challengerWs.send(JSON.stringify(startGame));
+          ws.send(JSON.stringify(startGame));
+          console.log(`Started game between ${data.from} and ${data.to}`);
+        }
+      } else {
+        console.log(`Challenger ${data.to} is not online`);
       }
     }
   });
@@ -538,7 +573,8 @@ wss.on('connection', (ws: WebSocket) => {
     console.log(`WebSocket connection closed. UserId: ${userId}`);
     if (username) {
       console.log(`Removing user from online users: ${username}`);
-      delete onlineUsers[userId];
+      delete onlineUsers[username];
+      delete wsClients[username];
       broadcastOnlineUsers();
     }
   });

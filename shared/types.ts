@@ -91,3 +91,30 @@ export interface OnlineUser {
   id: string;
   username: string;
 }
+
+/* WebSocket Messages */
+
+export type WebSocketMessage =
+  | {
+      type: 'login';
+      username: string;
+    }
+  | {
+      type: 'challenge';
+      from: string;
+      to: string;
+    }
+  | {
+      type: 'challenge_received';
+      from: string;
+    }
+  | {
+      type: 'challenge_response';
+      from: string;
+      to: string;
+      accepted: boolean;
+    }
+  | {
+      type: 'start_game';
+      opponent: string;
+    };

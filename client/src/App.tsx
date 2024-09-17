@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Chessboard } from 'react-chessboard';
 import EvaluationBar from './components/EvaluationBar';
 import OpponentSelector from './components/OpponentSelector';
@@ -6,18 +6,107 @@ import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import { useChessGame } from './hooks/useChessGame';
 import { useOpponent } from './hooks/useOpponent';
-// Remove the Human option from the OpponentSelector component
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
+import { OnlineUser, WebSocketMessage } from '../../shared/types';
 import './App.css';
 
 const App: React.FC = () => {
   const { user, handleLogin, handleRegister, handleLogout } = useAuth();
-  const { game, fen, selectedPiece, moveHistory, evaluation, suggestedMove, makeAMove, onSquareClick, onPieceDrop, startNewGame, undoLastMove, setSuggestedMove } = useChessGame();
+  const { 
+    game, 
+    fen, 
+    selectedPiece, 
+    moveHistory, 
+    evaluation, 
+    suggestedMove, 
+    startNewGame, 
+    undoLastMove, 
+    setSuggestedMove 
+  } = useChessGame();
   const { opponent, setOpponent, searchDepth, setSearchDepth, setStockfishDepth } = useOpponent();
-  const { ws, onlineUsers } = useWebSocket(user);
+  const { ws } = useWebSocket(user);
+
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [incomingChallenges, setIncomingChallenges] = useState<string[]>([]);
 
   const boardSize = 600;
+
+  const startNewGameWithOpponent = useCallback((opponentUsername: string) => {
+    startNewGame(opponentUsername);
+  }, [startNewGame]);
+
+  useEffect(() => {
+    if (!ws) return;
+
+    ws.onmessage = (event: MessageEvent) => {
+      const data: WebSocketMessage = JSON.parse(event.data);
+      console.log('Received WebSocket message:', data);
+
+      if (data.type === 'challenge_received') {
+        setIncomingChallenges(prev => [...prev, data.from]);
+      }
+
+      if (data.type === 'challenge_response') {
+        if (data.accepted) {
+          alert(`${data.from} accepted your challenge! Starting new game.`);
+          startNewGameWithOpponent(data.from);
+        } else {
+          alert(`${data.from} rejected your challenge.`);
+        }
+      }
+
+      if (data.type === 'start_game') {
+        alert(`Starting game with ${data.opponent}`);
+        startNewGameWithOpponent(data.opponent);
+      }
+
+      if (data.type === 'onlineUsers') {
+        setOnlineUsers(data.users);
+      }
+    };
+
+    return () => {
+      ws.onmessage = null;
+    };
+  }, [ws, setOnlineUsers, startNewGameWithOpponent]);
+
+  const handleChallenge = (targetUsername: string) => {
+    if (!ws) return;
+    const challengeMessage: WebSocketMessage = {
+      type: 'challenge',
+      from: user?.username || '',
+      to: targetUsername
+    };
+    ws.send(JSON.stringify(challengeMessage));
+    alert(`Challenge sent to ${targetUsername}`);
+  };
+
+  const handleAcceptChallenge = (fromUsername: string) => {
+    if (!ws) return;
+    const responseMessage: WebSocketMessage = {
+      type: 'challenge_response',
+      from: user?.username || '',
+      to: fromUsername,
+      accepted: true
+    };
+    ws.send(JSON.stringify(responseMessage));
+    setIncomingChallenges(prev => prev.filter(username => username !== fromUsername));
+    startNewGameWithOpponent(fromUsername);
+  };
+
+  const handleRejectChallenge = (fromUsername: string) => {
+    if (!ws) return;
+    const responseMessage: WebSocketMessage = {
+      type: 'challenge_response',
+      from: user?.username || '',
+      to: fromUsername,
+      accepted: false
+    };
+    ws.send(JSON.stringify(responseMessage));
+    setIncomingChallenges(prev => prev.filter(username => username !== fromUsername));
+    alert(`Rejected challenge from ${fromUsername}`);
+  };
 
   const requestSuggestion = async () => {
     if (game.turn() === 'w') {
@@ -49,6 +138,19 @@ const App: React.FC = () => {
     } else {
       console.log("It's not White's turn to move");
     }
+  };
+
+  const onPieceDrop = (sourceSquare: string, targetSquare: string) => {
+    // Implement move logic here
+    // This function should interact with your useChessGame hook to make a move
+    // For example:
+    // makeAMove(sourceSquare, targetSquare);
+    // Ensure that your hooks provide the necessary functions
+    return true;
+  };
+
+  const onSquareClick = (square: string) => {
+    // Implement any additional logic for square clicks here
   };
 
   return (
@@ -118,12 +220,29 @@ const App: React.FC = () => {
               <h3>Online Players</h3>
               {onlineUsers.length > 0 ? (
                 <ul>
-                  {onlineUsers.map((onlineUser) => (
-                    <li key={onlineUser.id}>{onlineUser.username}</li>
-                  ))}
+                  {onlineUsers
+                    .filter((onlineUser: OnlineUser) => onlineUser.username !== user.username)
+                    .map((onlineUser: OnlineUser) => (
+                      <li key={onlineUser.id}>
+                        {onlineUser.username}
+                        <button className="challenge-button" onClick={() => handleChallenge(onlineUser.username)}>Challenge</button>
+                      </li>
+                    ))}
                 </ul>
               ) : (
                 <p>No other players online</p>
+              )}
+              {incomingChallenges.length > 0 && (
+                <div className="incoming-challenges">
+                  <h4>Incoming Challenges:</h4>
+                  {incomingChallenges.map((challenger, index) => (
+                    <div key={index} className="challenge-item">
+                      <span>{challenger} has challenged you to a game.</span>
+                      <button className="accept-button" onClick={() => handleAcceptChallenge(challenger)}>Accept</button>
+                      <button className="reject-button" onClick={() => handleRejectChallenge(challenger)}>Reject</button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
