@@ -186,7 +186,22 @@
   /* Darker red on hover */
 }
 
-/* ... rest of your styles ... */
+.challenge-user {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.challenge-button {
+  padding: 5px 10px;
+  margin-left: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  background-color: #4caf50;
+  /* Green color for challenge button */
+  color: white;
+  border: none;
+  border-radius: 4px;
+}
 
 .auth-container {
   display: flex;

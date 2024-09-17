@@ -13,16 +13,16 @@ import './App.css';
 
 const App: React.FC = () => {
   const { user, handleLogin, handleRegister, handleLogout } = useAuth();
-  const { 
-    game, 
-    fen, 
-    selectedPiece, 
-    moveHistory, 
-    evaluation, 
-    suggestedMove, 
-    startNewGame, 
-    undoLastMove, 
-    setSuggestedMove 
+  const {
+    game,
+    fen,
+    selectedPiece,
+    moveHistory,
+    evaluation,
+    suggestedMove,
+    startNewGame,
+    undoLastMove,
+    setSuggestedMove
   } = useChessGame();
   const { opponent, setOpponent, searchDepth, setSearchDepth, setStockfishDepth } = useOpponent();
   const { ws } = useWebSocket(user);
@@ -223,7 +223,7 @@ const App: React.FC = () => {
                   {onlineUsers
                     .filter((onlineUser: OnlineUser) => onlineUser.username !== user.username)
                     .map((onlineUser: OnlineUser) => (
-                      <li key={onlineUser.id}>
+                      <li class="challenge-user" key={onlineUser.id}>
                         {onlineUser.username}
                         <button className="challenge-button" onClick={() => handleChallenge(onlineUser.username)}>Challenge</button>
                       </li>
