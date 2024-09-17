@@ -518,15 +518,18 @@ wss.on('connection', (ws: WebSocket) => {
     const data: WebSocketMessage = JSON.parse(message);
     if (data.type === 'login' && typeof data.username === 'string') {
       console.log(`User logging in: ${data.username}`);
-      if (username) {
-        console.log(`Removing existing user: ${username}`);
-        delete onlineUsers[username];
-        delete wsClients[username];
-      }
+      // Remove any existing entries for this user
+      Object.keys(onlineUsers).forEach(key => {
+        if (onlineUsers[key].username === data.username) {
+          console.log(`Removing existing user: ${data.username}`);
+          delete onlineUsers[key];
+          delete wsClients[data.username];
+        }
+      });
       username = data.username;
-      onlineUsers[username] = { id: userId, username: data.username };
+      onlineUsers[userId] = { id: userId, username: data.username };
       wsClients[username] = ws;
-      console.log(`Added user to online users: ${JSON.stringify(onlineUsers[username])}`);
+      console.log(`Added user to online users: ${JSON.stringify(onlineUsers[userId])}`);
       broadcastOnlineUsers();
     } else if (data.type === 'challenge' && data.from && data.to) {
       console.log(`Challenge from ${data.from} to ${data.to}`);
@@ -584,7 +587,9 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 function broadcastOnlineUsers() {
-  const users = Object.values(onlineUsers);
+  // Use a Set to ensure unique usernames
+  const uniqueUsers = new Set(Object.values(onlineUsers).map(user => JSON.stringify(user)));
+  const users = Array.from(uniqueUsers).map(user => JSON.parse(user));
   console.log(`Broadcasting online users: ${JSON.stringify(users)}`);
   const message = JSON.stringify({ type: 'onlineUsers', users });
   wss.clients.forEach((client) => {

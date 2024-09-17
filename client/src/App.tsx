@@ -223,7 +223,7 @@ const App: React.FC = () => {
                   {onlineUsers
                     .filter((onlineUser: OnlineUser) => onlineUser.username !== user.username)
                     .map((onlineUser: OnlineUser) => (
-                      <li class="challenge-user" key={onlineUser.id}>
+                      <li className="challenge-user" key={onlineUser.id}>
                         {onlineUser.username}
                         <button className="challenge-button" onClick={() => handleChallenge(onlineUser.username)}>Challenge</button>
                       </li>
@@ -232,19 +232,19 @@ const App: React.FC = () => {
               ) : (
                 <p>No other players online</p>
               )}
-              {incomingChallenges.length > 0 && (
-                <div className="incoming-challenges">
-                  <h4>Incoming Challenges:</h4>
-                  {incomingChallenges.map((challenger, index) => (
-                    <div key={index} className="challenge-item">
-                      <span>{challenger} has challenged you to a game.</span>
-                      <button className="accept-button" onClick={() => handleAcceptChallenge(challenger)}>Accept</button>
-                      <button className="reject-button" onClick={() => handleRejectChallenge(challenger)}>Reject</button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
+            {incomingChallenges.length > 0 && (
+              <div className="incoming-challenges">
+                <h4>Incoming Challenges:</h4>
+                {incomingChallenges.map((challenger, index) => (
+                  <div key={index} className="challenge-item">
+                    <span>{challenger} has challenged you to a game.</span>
+                    <button className="accept-button" onClick={() => handleAcceptChallenge(challenger)}>Accept</button>
+                    <button className="reject-button" onClick={() => handleRejectChallenge(challenger)}>Reject</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       ) : (
