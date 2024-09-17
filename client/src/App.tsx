@@ -6,6 +6,7 @@ import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import { useChessGame } from './hooks/useChessGame';
 import { useOpponent } from './hooks/useOpponent';
+// Remove the Human option from the OpponentSelector component
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import './App.css';

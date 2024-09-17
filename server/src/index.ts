@@ -209,8 +209,6 @@ async function getNextMove(board: string, opponent: string): Promise<SuccessfulG
       return getStockfishMove(board);
     case 'chess_tune':
       return getChessTuneMove(board);
-    case 'human':
-      throw new Error('Human moves should be handled client-side');
     default:
       throw new Error('Invalid opponent type');
   }
