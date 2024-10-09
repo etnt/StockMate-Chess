@@ -3,5 +3,7 @@
     "workbench.colorCustomizations": {
         "diffEditor.insertedTextBackground": "#DBEDFF80",
         "diffEditor.removedTextBackground": "#FFDCD780"
-    }
+    },
+    "IDX.aI.enableInlineCompletion": true,
+    "IDX.aI.enableCodebaseIndexing": true
 }
