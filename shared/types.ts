@@ -117,4 +117,8 @@ export type WebSocketMessage =
   | {
       type: 'start_game';
       opponent: string;
+    }
+  | {
+      type: 'onlineUsers';
+      users: OnlineUser[];
     };

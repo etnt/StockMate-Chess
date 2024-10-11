@@ -22,7 +22,11 @@ const App: React.FC = () => {
     suggestedMove,
     startNewGame,
     undoLastMove,
-    setSuggestedMove
+    setSuggestedMove,
+    onPieceDrop,
+    onSquareClick,
+    gameStatus,
+    resign
   } = useChessGame();
   const { opponent, setOpponent, searchDepth, setSearchDepth, setStockfishDepth } = useOpponent();
   const { ws } = useWebSocket(user);
@@ -140,17 +144,10 @@ const App: React.FC = () => {
     }
   };
 
-  const onPieceDrop = (sourceSquare: string, targetSquare: string) => {
-    // Implement move logic here
-    // This function should interact with your useChessGame hook to make a move
-    // For example:
-    // makeAMove(sourceSquare, targetSquare);
-    // Ensure that your hooks provide the necessary functions
-    return true;
-  };
-
-  const onSquareClick = (square: string) => {
-    // Implement any additional logic for square clicks here
+  const handleResign = () => {
+    if (gameStatus === 'active' && game.turn() === 'w') {
+      resign();
+    }
   };
 
   return (
@@ -192,6 +189,7 @@ const App: React.FC = () => {
               }}>New Game</button>
               <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
               <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
+              <button className="resign-button" onClick={handleResign} disabled={gameStatus !== 'active' || game.turn() !== 'w'}>Resign</button>
             </div>
             <div className="board-evaluation-history">
               <div className="board-and-evaluation">
@@ -216,24 +214,32 @@ const App: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="online-players">
-              <h3>Online Players</h3>
-              {onlineUsers.length > 0 ? (
-                <ul>
-                  {onlineUsers
-                    .filter((onlineUser: OnlineUser) => onlineUser.username !== user.username)
-                    .map((onlineUser: OnlineUser) => (
-                      <li className="challenge-user" key={onlineUser.id}>
-                        {onlineUser.username}
-                        <button className="challenge-button" onClick={() => handleChallenge(onlineUser.username)}>Challenge</button>
-                      </li>
-                    ))}
-                </ul>
-              ) : (
-                <p>No other players online</p>
-              )}
+            <div className="game-status">
+              {gameStatus === 'active' && <p>Game in progress</p>}
+              {gameStatus === 'resigned' && <p>White resigned. Black wins!</p>}
+              {gameStatus === 'checkmate' && <p>Checkmate! {game.turn() === 'w' ? 'Black' : 'White'} wins!</p>}
+              {gameStatus === 'draw' && <p>Game ended in a draw</p>}
             </div>
-            {incomingChallenges.length > 0 && (
+            {opponent !== 'stockfish' && (
+              <div className="online-players">
+                <h3>Online Players</h3>
+                {onlineUsers.length > 0 ? (
+                  <ul>
+                    {onlineUsers
+                      .filter((onlineUser: OnlineUser) => onlineUser.username !== user.username)
+                      .map((onlineUser: OnlineUser) => (
+                        <li className="challenge-user" key={onlineUser.id}>
+                          {onlineUser.username}
+                          <button className="challenge-button" onClick={() => handleChallenge(onlineUser.username)}>Challenge</button>
+                        </li>
+                      ))}
+                  </ul>
+                ) : (
+                  <p>No other players online</p>
+                )}
+              </div>
+            )}
+            {incomingChallenges.length > 0 && opponent !== 'stockfish' && (
               <div className="incoming-challenges">
                 <h4>Incoming Challenges:</h4>
                 {incomingChallenges.map((challenger, index) => (

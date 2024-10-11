@@ -2,50 +2,17 @@ import { useState, useEffect } from 'react';
 import { Chess, Square } from 'chess.js';
 import { GetMoveRequest, GetMoveResponse, MoveRequest, MoveResponse } from '../../../shared/types';
 
-/**
- * Custom React hook for managing a chess game.
- * 
- * This hook encapsulates the logic for:
- * - Managing the game state
- * - Handling user moves
- * - Interacting with an AI opponent
- * - Updating the game history
- * - Managing the game's evaluation
- * 
- * @returns An object containing the game state and functions to interact with the game.
- */
 export function useChessGame() {
-  // The current state of the chess game
   const [game, setGame] = useState(new Chess());
-
-  // The current board position in Forsyth-Edwards Notation (FEN)
   const [fen, setFen] = useState(game.fen());
-
-  // The currently selected piece on the board (if any)
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
-
-  // A formatted string representation of the move history
   const [moveHistory, setMoveHistory] = useState('');
-
-  // An array of all moves made in the game in Standard Algebraic Notation (SAN)
   const [fullHistory, setFullHistory] = useState<string[]>([]);
-
-  // The current evaluation of the board position (positive favors white, negative favors black)
   const [evaluation, setEvaluation] = useState(0);
-
-  // A suggested move for the current player (if any)
   const [suggestedMove, setSuggestedMove] = useState(null);
-
-  // The type of opponent (e.g., 'stockfish' for AI, 'human' for human player)
   const [opponent, setOpponent] = useState<string>('stockfish');
+  const [gameStatus, setGameStatus] = useState<'active' | 'resigned' | 'checkmate' | 'draw'>('active');
 
-  /**
-   * Effect hook to update the game state and request moves from the AI opponent.
-   * 
-   * This effect runs whenever the game state or move history changes.
-   * It updates the FEN representation of the board and the move history.
-   * If it's black's turn and the opponent is not human, it requests a move from the AI.
-   */
   useEffect(() => {
     setFen(game.fen());
     updateMoveHistory();
@@ -54,14 +21,8 @@ export function useChessGame() {
     }
   }, [game, fullHistory, opponent]);
 
-  /**
-   * Attempts to make a move on the chess board.
-   * 
-   * @param from - The starting square of the move
-   * @param to - The ending square of the move
-   * @returns The move in Standard Algebraic Notation (SAN) if successful, null otherwise
-   */
-  const makeAMove = async (from: Square, to: Square) => {
+  const makeAMove = (from: Square, to: Square) => {
+    console.log('makeAMove called with:', from, to);
     const gameCopy = new Chess(game.fen());
     try {
       const result = gameCopy.move({ from, to, promotion: 'q' });
@@ -72,6 +33,7 @@ export function useChessGame() {
         setFullHistory(prevHistory => [...prevHistory, result.san]);
         setSuggestedMove(null);
         setSelectedPiece(null);
+        updateGameStatus(gameCopy);
         return result.san;
       }
     } catch (error) {
@@ -80,16 +42,6 @@ export function useChessGame() {
     return null;
   };
 
-  /**
-   * Handles the click event on a chess square.
-   * 
-   * This function manages the piece selection and move execution process:
-   * - If no piece is selected, it selects a piece of the current player's color.
-   * - If a piece is already selected, it attempts to make a move to the clicked square.
-   * - If the move is invalid, it either selects a new piece or deselects the current piece.
-   * 
-   * @param square - The clicked square on the chess board
-   */
   const onSquareClick = (square: Square) => {
     if (selectedPiece === null) {
       const piece = game.get(square);
@@ -112,14 +64,19 @@ export function useChessGame() {
   };
 
   const onPieceDrop = (sourceSquare: string, targetSquare: string) => {
+    console.log('onPieceDrop called with:', sourceSquare, targetSquare);
     if (selectedPiece !== null) {
+      console.log('Piece already selected, returning false');
       return false;
     }
 
     if (isValidSquare(sourceSquare) && isValidSquare(targetSquare)) {
+      console.log('Valid squares, attempting to make move');
       const result = makeAMove(sourceSquare as Square, targetSquare as Square);
+      console.log('Move result:', result);
       return result !== null;
     }
+    console.log('Invalid squares, returning false');
     return false;
   };
 
@@ -160,6 +117,7 @@ export function useChessGame() {
       setFen(newGame.fen());
       setFullHistory(prevHistory => [...prevHistory, result.san]);
       setEvaluation(evaluation);
+      updateGameStatus(newGame);
 
       console.log('Move applied, new FEN:', newGame.fen());
 
@@ -190,8 +148,8 @@ export function useChessGame() {
     setSuggestedMove(null);
     setSelectedPiece(null);
     setOpponent(selectedOpponent);
+    setGameStatus('active');
 
-    // If the opponent is not 'human', request a move for black
     if (selectedOpponent !== 'human' && newGame.turn() === 'b') {
       setTimeout(() => requestMove(), 500);
     }
@@ -215,6 +173,7 @@ export function useChessGame() {
       setSuggestedMove(null);
       setSelectedPiece(null);
       updateMoveHistory();
+      updateGameStatus(newGame);
 
       if (newHistory.length > 0) {
         const newEvaluation = await requestEvaluation(newGame.fen());
@@ -229,6 +188,23 @@ export function useChessGame() {
     }
   };
 
+  const resign = () => {
+    if (game.turn() === 'w') {
+      setGameStatus('resigned');
+      console.log('White resigned');
+    } else {
+      console.log('Only White can resign');
+    }
+  };
+
+  const updateGameStatus = (currentGame: Chess) => {
+    if (currentGame.isCheckmate()) {
+      setGameStatus('checkmate');
+    } else if (currentGame.isDraw()) {
+      setGameStatus('draw');
+    }
+  };
+
   return {
     game,
     fen,
@@ -238,6 +214,7 @@ export function useChessGame() {
     evaluation,
     suggestedMove,
     opponent,
+    gameStatus,
     makeAMove,
     onSquareClick,
     onPieceDrop,
@@ -245,7 +222,8 @@ export function useChessGame() {
     startNewGame,
     undoLastMove,
     setSuggestedMove,
-    setOpponent
+    setOpponent,
+    resign
   };
 }
 

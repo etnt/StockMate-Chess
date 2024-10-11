@@ -13,7 +13,6 @@ a web app with these technologies.
 
 Start the server:
 
-    cd server
     npm start
 
 Start the client:
