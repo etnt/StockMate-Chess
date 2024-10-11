@@ -158,6 +158,12 @@ const App: React.FC = () => {
           <div className="welcome-container">
             <h2 className="welcome-message">Welcome {user.username}!</h2>
             <button className="logout-button" onClick={handleLogout}>Logout</button>
+            <div className="game-status">
+              {gameStatus === 'active' && <p></p>}
+              {gameStatus === 'resigned' && <p>White resigned. Black wins!</p>}
+              {gameStatus === 'checkmate' && <p>Checkmate! {game.turn() === 'w' ? 'Black' : 'White'} wins!</p>}
+              {gameStatus === 'draw' && <p>Game ended in a draw</p>}
+          </div>
           </div>
           <div className="game-container">
             <div className="side-controls">
@@ -213,12 +219,6 @@ const App: React.FC = () => {
                   placeholder="Moves will appear here as they are made..."
                 />
               </div>
-            </div>
-            <div className="game-status">
-              {gameStatus === 'active' && <p>Game in progress</p>}
-              {gameStatus === 'resigned' && <p>White resigned. Black wins!</p>}
-              {gameStatus === 'checkmate' && <p>Checkmate! {game.turn() === 'w' ? 'Black' : 'White'} wins!</p>}
-              {gameStatus === 'draw' && <p>Game ended in a draw</p>}
             </div>
             {opponent !== 'stockfish' && (
               <div className="online-players">
