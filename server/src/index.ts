@@ -4,6 +4,7 @@ import { Engine } from 'node-uci';
 import { Chess } from 'chess.js';
 import axios from 'axios';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { GetMoveRequest, GetMoveResponse, SuccessfulGetMoveResponse, ErrorResponse } from '../../shared/types';
@@ -31,11 +32,14 @@ app.use(cors({
   credentials: true
 }));
 
+// This is a built-in middleware function provided by Express.js.
+// Its purpose is to parse incoming requests with JSON payloads and
+// make the parsed data available in req.body.
 app.use(express.json());
 
 // Secret keys for JWT
-const ACCESS_TOKEN_SECRET = 'your_access_token_secret';
-const REFRESH_TOKEN_SECRET = 'your_refresh_token_secret';
+const ACCESS_TOKEN_SECRET = crypto.randomBytes(64).toString('hex');
+const REFRESH_TOKEN_SECRET = crypto.randomBytes(64).toString('hex');
 
 // In-memory storage for refresh tokens and online users (replace with a database in production)
 let refreshTokens: string[] = [];
@@ -325,6 +329,8 @@ app.post<{}, AuthResponse, UserRegistrationRequest>('/api/register', async (req,
     const userId = await createUser(username, password);
     const accessToken = jwt.sign({ userId, username }, ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
     const refreshToken = jwt.sign({ userId, username }, REFRESH_TOKEN_SECRET);
+    // Adds the generated refresh token to an array, a more robust solutions
+    // (like a database) should be used in production.
     refreshTokens.push(refreshToken);
 
     console.log('Registration successful, tokens generated');
