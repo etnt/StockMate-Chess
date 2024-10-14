@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User } from '../../../shared/types';
 import { login, register, logout, getUserData } from '../services/api';
 
@@ -18,6 +18,23 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
 
   /**
+   * Fetches the current user's data from the server.
+   * 
+   * This function is called when the component mounts if an access token is present,
+   * and after successful login or registration.
+   */
+  const fetchUserData = useCallback(async () => {
+    try {
+      const userData = await getUserData();
+      console.log('Fetched user data:', userData);
+      setUser(userData);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      handleLogout();
+    }
+  }, []);
+
+  /**
    * Effect hook to check for an existing authentication token and fetch user data if present.
    * 
    * This effect runs once when the component mounts.
@@ -27,24 +44,7 @@ export function useAuth() {
     if (token) {
       fetchUserData();
     }
-  }, []);
-
-  /**
-   * Fetches the current user's data from the server.
-   * 
-   * This function is called when the component mounts if an access token is present,
-   * and after successful login or registration.
-   */
-  const fetchUserData = async () => {
-    try {
-      const userData = await getUserData();
-      console.log('Fetched user data:', userData);
-      setUser(userData);
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      handleLogout();
-    }
-  };
+  }, [fetchUserData]);
 
   /**
    * Attempts to log in a user with the provided credentials.
@@ -66,7 +66,7 @@ export function useAuth() {
         throw new Error(data.error || 'Login failed');
       }
     } catch (error) {
-      console.error('Login error:', error.message);
+      console.error('Login error:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   };
@@ -87,7 +87,7 @@ export function useAuth() {
         throw new Error(data.error || 'Registration failed');
       }
     } catch (error) {
-      console.error('Registration failed:', error.message);
+      console.error('Registration failed:', error instanceof Error ? error.message : String(error));
       throw error;
     }
   };
@@ -99,7 +99,7 @@ export function useAuth() {
    */
   const handleLogout = () => {
     console.log('Logging out');
-    logout();
+    logout(null); // Passing null as we don't have access to WebSocket here
     setUser(null);
   };
 

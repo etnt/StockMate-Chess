@@ -25,7 +25,8 @@ const port = process.env.PORT || 3001;
 
 // Configure CORS for the Express app
 app.use(cors({
-  origin: 'http://localhost:3000',
+  //origin: 'http://localhost:3000',
+  origin: 'https://stockmate-chess-7358137-eu.preview.app.idx.dev'
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
