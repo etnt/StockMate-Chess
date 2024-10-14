@@ -26,7 +26,9 @@ const App: React.FC = () => {
     onPieceDrop,
     onSquareClick,
     gameStatus,
-    resign
+    resign,
+    boardOrientation,
+    isChallenger
   } = useChessGame();
   const { opponent, setOpponent, searchDepth, setSearchDepth, setStockfishDepth } = useOpponent();
   const { ws } = useWebSocket(user);
@@ -36,8 +38,8 @@ const App: React.FC = () => {
 
   const boardSize = 600;
 
-  const startNewGameWithOpponent = useCallback((opponentUsername: string) => {
-    startNewGame(opponentUsername);
+  const startNewGameWithOpponent = useCallback((opponentUsername: string, userIsChallenger: boolean) => {
+    startNewGame(opponentUsername, userIsChallenger);
   }, [startNewGame]);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ const App: React.FC = () => {
       if (data.type === 'challenge_response') {
         if (data.accepted) {
           alert(`${data.from} accepted your challenge! Starting new game.`);
-          startNewGameWithOpponent(data.from);
+          startNewGameWithOpponent(data.from, true);
         } else {
           alert(`${data.from} rejected your challenge.`);
         }
@@ -62,7 +64,7 @@ const App: React.FC = () => {
 
       if (data.type === 'start_game') {
         alert(`Starting game with ${data.opponent}`);
-        startNewGameWithOpponent(data.opponent);
+        startNewGameWithOpponent(data.opponent, false);
       }
 
       if (data.type === 'onlineUsers') {
@@ -96,7 +98,7 @@ const App: React.FC = () => {
     };
     ws.send(JSON.stringify(responseMessage));
     setIncomingChallenges(prev => prev.filter(username => username !== fromUsername));
-    startNewGameWithOpponent(fromUsername);
+    startNewGameWithOpponent(fromUsername, false);
   };
 
   const handleRejectChallenge = (fromUsername: string) => {
@@ -145,7 +147,7 @@ const App: React.FC = () => {
   };
 
   const handleResign = () => {
-    if (gameStatus === 'active' && game.turn() === 'w') {
+    if (gameStatus === 'active' && ((isChallenger && game.turn() === 'w') || (!isChallenger && game.turn() === 'b'))) {
       resign();
     }
   };
@@ -160,10 +162,10 @@ const App: React.FC = () => {
             <button className="logout-button" onClick={handleLogout}>Logout</button>
             <div className="game-status">
               {gameStatus === 'active' && <p></p>}
-              {gameStatus === 'resigned' && <p>White resigned. Black wins!</p>}
+              {gameStatus === 'resigned' && <p>{isChallenger ? 'White' : 'Black'} resigned. {isChallenger ? 'Black' : 'White'} wins!</p>}
               {gameStatus === 'checkmate' && <p>Checkmate! {game.turn() === 'w' ? 'Black' : 'White'} wins!</p>}
               {gameStatus === 'draw' && <p>Game ended in a draw</p>}
-          </div>
+            </div>
           </div>
           <div className="game-container">
             <div className="side-controls">
@@ -191,11 +193,11 @@ const App: React.FC = () => {
               )}
               <button className="new-game-button" onClick={() => {
                 console.log("Starting new game with opponent:", opponent);
-                startNewGame(opponent);
+                startNewGame(opponent, true);
               }}>New Game</button>
               <button className="suggest-button" onClick={requestSuggestion}>Suggest</button>
               <button className="go-back-button" onClick={undoLastMove}>Go Back</button>
-              <button className="resign-button" onClick={handleResign} disabled={gameStatus !== 'active' || game.turn() !== 'w'}>Resign</button>
+              <button className="resign-button" onClick={handleResign} disabled={gameStatus !== 'active' || (isChallenger ? game.turn() !== 'w' : game.turn() !== 'b')}>Resign</button>
             </div>
             <div className="board-evaluation-history">
               <div className="board-and-evaluation">
@@ -203,6 +205,7 @@ const App: React.FC = () => {
                   position={fen}
                   onPieceDrop={onPieceDrop}
                   onSquareClick={onSquareClick}
+                  boardOrientation={boardOrientation}
                   customSquareStyles={{
                     ...(selectedPiece && { [selectedPiece]: { backgroundColor: 'rgba(255, 255, 0, 0.4)' } }),
                     ...(suggestedMove?.from && { [suggestedMove.from]: { backgroundColor: 'rgba(0, 255, 0, 0.4)' } }),

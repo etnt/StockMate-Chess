@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Chess, Square } from 'chess.js';
-import { GetMoveRequest, GetMoveResponse, MoveRequest, MoveResponse } from '../../../shared/types';
+import { GetMoveRequest, GetMoveResponse, MoveRequest, MoveResponse, SuggestedMove } from '../../../shared/types';
 
 export function useChessGame() {
   const [game, setGame] = useState(new Chess());
@@ -9,17 +9,21 @@ export function useChessGame() {
   const [moveHistory, setMoveHistory] = useState('');
   const [fullHistory, setFullHistory] = useState<string[]>([]);
   const [evaluation, setEvaluation] = useState(0);
-  const [suggestedMove, setSuggestedMove] = useState(null);
+  const [suggestedMove, setSuggestedMove] = useState<SuggestedMove | null>(null);
   const [opponent, setOpponent] = useState<string>('stockfish');
   const [gameStatus, setGameStatus] = useState<'active' | 'resigned' | 'checkmate' | 'draw'>('active');
+  const [isChallenger, setIsChallenger] = useState<boolean | null>(null);
+  const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
 
   useEffect(() => {
     setFen(game.fen());
     updateMoveHistory();
-    if (game.turn() === 'b' && opponent !== 'human') {
-      requestMove();
+    if ((game.turn() === 'b' && isChallenger) || (game.turn() === 'w' && !isChallenger)) {
+      if (opponent !== 'human') {
+        requestMove();
+      }
     }
-  }, [game, fullHistory, opponent]);
+  }, [game, fullHistory, opponent, isChallenger]);
 
   const makeAMove = (from: Square, to: Square) => {
     console.log('makeAMove called with:', from, to);
@@ -43,6 +47,13 @@ export function useChessGame() {
   };
 
   const onSquareClick = (square: Square) => {
+    if (
+      (isChallenger && game.turn() === 'b') ||
+      (!isChallenger && game.turn() === 'w')
+    ) {
+      return; // Not this player's turn
+    }
+
     if (selectedPiece === null) {
       const piece = game.get(square);
       if (piece && piece.color === game.turn()) {
@@ -64,6 +75,13 @@ export function useChessGame() {
   };
 
   const onPieceDrop = (sourceSquare: string, targetSquare: string) => {
+    if (
+      (isChallenger && game.turn() === 'b') ||
+      (!isChallenger && game.turn() === 'w')
+    ) {
+      return false; // Not this player's turn
+    }
+
     console.log('onPieceDrop called with:', sourceSquare, targetSquare);
     if (selectedPiece !== null) {
       console.log('Piece already selected, returning false');
@@ -137,7 +155,7 @@ export function useChessGame() {
     setMoveHistory(formattedHistory.trim());
   };
 
-  const startNewGame = (selectedOpponent: string) => {
+  const startNewGame = (selectedOpponent: string, userIsChallenger: boolean) => {
     console.log("Starting new game with opponent:", selectedOpponent);
     const newGame = new Chess();
     setGame(newGame);
@@ -149,8 +167,10 @@ export function useChessGame() {
     setSelectedPiece(null);
     setOpponent(selectedOpponent);
     setGameStatus('active');
+    setIsChallenger(userIsChallenger);
+    setBoardOrientation(userIsChallenger ? 'white' : 'black');
 
-    if (selectedOpponent !== 'human' && newGame.turn() === 'b') {
+    if (selectedOpponent !== 'human' && !userIsChallenger) {
       setTimeout(() => requestMove(), 500);
     }
   };
@@ -189,11 +209,11 @@ export function useChessGame() {
   };
 
   const resign = () => {
-    if (game.turn() === 'w') {
+    if ((isChallenger && game.turn() === 'w') || (!isChallenger && game.turn() === 'b')) {
       setGameStatus('resigned');
-      console.log('White resigned');
+      console.log(isChallenger ? 'White' : 'Black' + ' resigned');
     } else {
-      console.log('Only White can resign');
+      console.log('It\'s not your turn to resign');
     }
   };
 
@@ -215,13 +235,15 @@ export function useChessGame() {
     suggestedMove,
     opponent,
     gameStatus,
+    isChallenger,
+    boardOrientation,
     makeAMove,
     onSquareClick,
     onPieceDrop,
     requestMove,
     startNewGame,
     undoLastMove,
-    setSuggestedMove,
+    setSuggestedMove: (move: SuggestedMove | null) => setSuggestedMove(move),
     setOpponent,
     resign
   };

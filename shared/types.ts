@@ -122,3 +122,10 @@ export type WebSocketMessage =
       type: 'onlineUsers';
       users: OnlineUser[];
     };
+
+/* Suggested Move */
+export interface SuggestedMove {
+  from: string;
+  to: string;
+  promotion?: string;
+}
