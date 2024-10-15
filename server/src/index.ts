@@ -23,9 +23,21 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 const port = process.env.PORT || 3001;
 
-// Configure CORS for the Express app
+// Define the whitelist of allowed origins
+const whitelist = [
+  'https://redesigned-carnival-q7vjv65vcx9gv-3000.app.github.dev', // Your Codespace URL
+  'http://localhost:3000' // Local development URL
+];
+
+// Configure CORS middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: function (origin, callback) {
+    if (!origin || whitelist.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -68,7 +80,9 @@ async function initializeEngine() {
   console.log('Stockfish engine initialized');
 }
 
-initializeEngine();
+initializeEngine().catch((error) => {
+  console.error('Failed to initialize Stockfish engine:', error);
+});
 
 /**
  * Set the search depth for the Stockfish engine.

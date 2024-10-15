@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { GetMoveRequest, GetMoveResponse } from '../../shared/types';
 
+//const API_URL = 'http://localhost:3001/api';
 // Define the base URL for our API. This is where all our requests will be sent.
-const API_URL = 'http://localhost:3001/api';
+// setup: REACT_APP_API_URL=https://<your-codespace-name>-3001.<your-codespace-domain>/api
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 /**
  * Create an axios instance with predefined configuration.
