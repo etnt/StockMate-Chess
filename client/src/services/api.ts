@@ -1,10 +1,18 @@
 import axios from 'axios';
 import { GetMoveRequest, GetMoveResponse } from '../../shared/types';
 
-//const API_URL = 'http://localhost:3001/api';
-// Define the base URL for our API. This is where all our requests will be sent.
-// setup: REACT_APP_API_URL=https://<your-codespace-name>-3001.<your-codespace-domain>/api
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+
+// Set: REACT_APP_CODESPACES=true in the ~ /client/.env file
+const codeSpaceUrl = 'redesigned-carnival-q7vjv65vcx9gv-3001.app.github.dev';
+const codespace = process.env.REACT_APP_CODESPACES 
+if (codespace === undefined) {
+  console.error('REACT_APP_CODESPACES environment variable is not set');
+  alert('REACT_APP_CODESPACES environment variable is not set; the application cannot proceed. Set it in the .env file');
+  // Optionally, you can redirect to an error page or stop further execution
+  throw new Error('REACT_APP_CODESPACES environment variable is not set');
+}
+const isCodespace = codespace === 'true';
+const API_URL = isCodespace ? `https://${codeSpaceUrl}/api` : 'http://localhost:3001/api';
 
 /**
  * Create an axios instance with predefined configuration.
@@ -51,6 +59,7 @@ api.interceptors.request.use((config) => {
 export const login = async (username: string, password: string) => {
   try {
     const response = await api.post('/login', { username, password });
+    console.log('CODESPACES environment variable:', process.env.CODESPACES);
     if (response.data.accessToken) {
       localStorage.setItem('accessToken', response.data.accessToken);
       localStorage.setItem('refreshToken', response.data.refreshToken);
@@ -144,7 +153,7 @@ export const logout = async (ws: WebSocket | null) => {
 export const getUserData = async () => {
   try {
     const response = await api.get('/user');
-    console.log('User data response:', response.data);  // Add this line
+    console.log('User data response:', response.data); 
     return response.data;
   } catch (error) {
     console.error('Error fetching user data:', error.response ? error.response.data : error.message);

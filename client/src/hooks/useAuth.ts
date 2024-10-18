@@ -66,7 +66,7 @@ export function useAuth() {
         throw new Error(data.error || 'Login failed');
       }
     } catch (error) {
-      console.error('Login error:', error.message);
+      console.error('Login error:', (error as any).message);
       throw error;
     }
   };

@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import os from 'os';
 import { Engine } from 'node-uci';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { Chess } from 'chess.js';
 import axios from 'axios';
 import bcrypt from 'bcrypt';
@@ -16,6 +19,8 @@ import { addGame, getGames } from './database/models/Game';
 import http from 'http';
 import WebSocket from 'ws';
 import { Move } from 'chess.js';  // Make sure to import the Move type from chess.js
+
+const execAsync = promisify(exec);
 
 // Initialize Express app and set port
 const app = express();
@@ -74,7 +79,39 @@ let currentOpponent: string | null = null;
  * Initialize the Stockfish chess engine.
  */
 async function initializeEngine() {
-  engine = new Engine('/opt/homebrew/bin/stockfish');
+  let enginePath: string;
+
+  if (os.platform() === 'darwin') {
+    // macOS
+    enginePath = '/opt/homebrew/bin/stockfish';
+  } else if (os.platform() === 'linux') {
+    // Linux
+    try {
+      const { stdout } = await execAsync('which stockfish');
+      enginePath = stdout.trim();
+      if (!enginePath) {
+        throw new Error('Stockfish not found in PATH');
+      }
+    } catch {
+      // Fallback to the default path on Ubuntu 22.04
+      enginePath = '/usr/games/stockfish';
+    }
+
+    // Check if the fallback path points to the Stockfish binary
+    try {
+      const { stdout: versionOutput } = await execAsync(`${enginePath} --version`);
+      if (!versionOutput.includes('Stockfish')) {
+        throw new Error('Stockfish not found');
+      }
+    } catch (err) {
+      const error = err as Error;
+      throw new Error('Failed to locate Stockfish: ' + error.message);
+    }
+  } else {
+    throw new Error('Unsupported operating system');
+  }
+
+  engine = new Engine(enginePath);
   await engine.init();
   await engine.isready();
   console.log('Stockfish engine initialized');
