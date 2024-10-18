@@ -103,3 +103,28 @@ StockMate Chess implements several real-time features using WebSocket:
 - Live game state synchronization
 
 These features provide a dynamic and interactive user experience, allowing for seamless multiplayer gameplay and social interactions within the application.
+
+## Some more Notes about the application
+
+When you run npm start, the following happens:
+
+- `package.json lookup`: npm first looks for a package.json file in the current directory. This file is the heart of any Node.js project using npm.
+- `scripts section check`: Inside package.json, it searches for a scripts section. This section defines various commands that can be run using npm run <command>.
+- `start script execution`: The npm start command specifically looks for a "start" key within the scripts section. The value associated with "start" is the command that npm will execute.
+- `Command execution`: The value of the "start" script is then executed in your shell. This could be a simple command like node server.js, a more complex command involving multiple processes, or a command invoking another tool (like webpack, Parcel, or a build system).
+
+In our client code we find a `package.json`file where the `scripts` part contain:
+
+- `"start": "react-scripts start"` which means that when you run npm start (or yarn start), npm will execute the command: `react-scripts start`.
+
+Let's break it down:
+
+- `react-scripts`: This refers to the package react-scripts, which is a crucial part of Create React App (CRA). CRA is a popular tool for bootstrapping React applications. It provides a pre-configured development environment, including tools for building, testing, and running your React app.
+
+- `start`: This is the name of a command provided by react-scripts. When you run react-scripts start, it initiates the development server for your React application. This server does the following:
+
+- Compiles your code: It uses Babel to transpile your modern JavaScript code (including JSX) into something older browsers can understand.
+Runs a webpack development server: Webpack bundles your code, assets (images, CSS, etc.), and dependencies into optimized bundles for efficient loading in the browser. It also handles things like hot module replacement (HMR), allowing changes to your code to be reflected in the browser without a full page reload.
+- Starts a local web server: This makes your app accessible through a web browser at a specified URL (usually http://localhost:3000, but this can be configurable). It watches for changes in your source files and automatically recompiles and updates the browser as you save changes.
+
+In essence, `react-scripts start` sets up the entire development environment necessary for building and running your React application, handling all the complex configuration under the hood so you don't have to deal with it directly. It simplifies the development workflow significantly.
