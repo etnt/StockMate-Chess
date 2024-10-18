@@ -45,23 +45,24 @@ graph TD
     B -->|HTTP/WebSocket| A
     B -->|UCI| C[Stockfish Engine]
     B -->|Query/Update| D[(Database)]
-    
+
     subgraph Client
+    direction TB
     A1[React Components]
     A2[Hooks]
     A3[Services]
+    A1 --> A2
+    A2 --> A3
     end
     
     subgraph Server
+    direction TB
     B1[Express Routes]
     B2[WebSocket Handler]
     B3[Database Models]
-    end
-
-    A1 --> A2
-    A2 --> A3
     B1 --> B3
     B2 --> B3
+    end
 ```
 
 ### Component Details
@@ -90,5 +91,3 @@ graph TD
 5. **Stockfish Engine**:
    - Local chess engine for AI gameplay
    - Communicates with the server using the Universal Chess Interface (UCI) protocol
-
-
